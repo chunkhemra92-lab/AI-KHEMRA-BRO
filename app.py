@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import os
 import time
+import secrets
+from datetime import date, datetime
 from pathlib import Path
 
 import edge_tts
@@ -103,7 +105,13 @@ def split_srt_for_translation(srt_text: str, max_chars: int = 9000) -> list[str]
     return chunks
 
 
-def translate_srt_with_gemini(srt_text: str, api_keys: list[str], model_name: str, target_language: str) -> str:
+def translate_srt_with_gemini(
+    srt_text: str,
+    api_keys: list[str],
+    model_name: str,
+    target_language: str,
+    translation_style: str = "Chinese Drama Pro",
+) -> str:
     if genai is None:
         raise RuntimeError("Missing google-genai. Add google-genai to requirements.txt.")
     if not api_keys:
@@ -112,14 +120,35 @@ def translate_srt_with_gemini(srt_text: str, api_keys: list[str], model_name: st
     if not api_keys:
         raise ValueError("Please enter a Gemini API key in the sidebar.")
 
+    style_rules = {
+        "Chinese Drama Pro": (
+            "Translate as natural spoken dialogue for Chinese drama dubbing. "
+            "Preserve emotion, hierarchy, relationships, titles, pronouns, and dramatic tone. "
+            "Avoid literal word-for-word translation."
+        ),
+        "100% Audio Sync": (
+            "Keep each translated line concise enough to fit its original subtitle time. "
+            "Preserve meaning and emotion, but shorten wording when needed for speech timing."
+        ),
+        "Standard": (
+            "Translate clearly and naturally while preserving the original meaning."
+        ),
+    }
+    selected_rule = style_rules.get(translation_style, style_rules["Chinese Drama Pro"])
+
     prompt = f"""You are a professional subtitle translator.
 Translate the following SRT into {target_language}.
+
+Translation mode:
+{selected_rule}
+
 Rules:
 1. Keep every subtitle number and timestamp exactly unchanged.
 2. Return valid SRT only, without markdown fences or explanation.
-3. Use natural spoken language suitable for movie dubbing.
-4. Preserve existing speaker tags such as [M], [F], [BOY], [GIRL], [OLD_M], [OLD_F], [M_THINK], [F_THINK].
-5. Do not omit dialogue.
+3. Preserve existing speaker tags such as [M], [F], [BOY], [GIRL], [OLD_M], [OLD_F], [M_THINK], [F_THINK].
+4. Do not omit any dialogue.
+5. Remove source-language characters when the target is Khmer, except proper names that must be transliterated.
+6. Use short, natural spoken lines suitable for dubbing.
 
 SRT:
 """
@@ -255,7 +284,7 @@ async def synthesize_one(
     await communicate.save(output_path)
 
 
-def generate_dubbed_mp3(srt_text: str, voice_mode: str) -> bytes:
+def generate_dubbed_mp3(srt_text: str, voice_mode: str, sync_mode: str = "Speed Up Only") -> bytes:
     """
     Generate one synchronized MP3 with FFmpeg.
 
@@ -293,12 +322,42 @@ def generate_dubbed_mp3(srt_text: str, voice_mode: str) -> bytes:
         filters = []
         labels = []
 
+        def atempo_chain(value: float) -> str:
+            value = max(0.25, min(4.0, value))
+            parts = []
+            while value > 2.0:
+                parts.append("atempo=2.0")
+                value /= 2.0
+            while value < 0.5:
+                parts.append("atempo=0.5")
+                value /= 0.5
+            parts.append(f"atempo={value:.4f}")
+            return ",".join(parts)
+
         for index, item in enumerate(segments):
             slot_seconds = max(0.10, (item["end_ms"] - item["start_ms"]) / 1000)
             delay_ms = max(0, item["start_ms"])
             label = f"a{index}"
+
+            probe = subprocess.run(
+                [
+                    "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1", str(clip_paths[index])
+                ],
+                capture_output=True, text=True, timeout=30,
+            )
+            try:
+                clip_seconds = max(0.05, float((probe.stdout or "0").strip()))
+            except ValueError:
+                clip_seconds = slot_seconds
+
+            tempo = clip_seconds / slot_seconds
+            if sync_mode.startswith("Speed Up Only"):
+                tempo = max(1.0, tempo)
+
             filters.append(
                 f"[{index}:a]"
+                f"{atempo_chain(tempo)},"
                 f"atrim=0:{slot_seconds:.3f},"
                 f"asetpts=PTS-STARTPTS,"
                 f"adelay={delay_ms}|{delay_ms}"
@@ -344,6 +403,69 @@ def generate_dubbed_mp3(srt_text: str, voice_mode: str) -> bytes:
 
         return output_path.read_bytes()
 
+
+def get_secret(name: str, default: str = "") -> str:
+    """Read Railway/host environment first, then Streamlit secrets."""
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    try:
+        return str(st.secrets.get(name, default)).strip()
+    except Exception:
+        return default
+
+
+def plan_days_left(expiry_text: str) -> int:
+    try:
+        expiry = datetime.strptime(expiry_text, "%Y-%m-%d").date()
+        return max(0, (expiry - date.today()).days)
+    except Exception:
+        return 0
+
+
+def require_login() -> None:
+    st.session_state.setdefault("authenticated", False)
+
+    app_username = get_secret("APP_USERNAME", "owner")
+    app_password = get_secret("APP_PASSWORD", get_secret("ADMIN_PASSWORD", ""))
+    app_role = get_secret("APP_ROLE", app_username.upper())
+    plan_expiry = get_secret("PLAN_EXPIRY", "2027-06-30")
+
+    if st.session_state.authenticated:
+        st.session_state.login_username = app_username
+        st.session_state.login_role = app_role
+        st.session_state.plan_expiry = plan_expiry
+        return
+
+    st.markdown(
+        """
+        <div class="hero">
+          <h1>AI KHEMRA BRO</h1>
+          <p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.subheader("🔐 Login")
+    username = st.text_input("Username", key="login_user")
+    password = st.text_input("Password", type="password", key="login_password")
+
+    if not app_password:
+        st.error("APP_PASSWORD or ADMIN_PASSWORD is missing in Railway Variables.")
+        st.stop()
+
+    if st.button("Login", key="login_button"):
+        if secrets.compare_digest(username.strip(), app_username) and secrets.compare_digest(password, app_password):
+            st.session_state.authenticated = True
+            st.session_state.login_username = app_username
+            st.session_state.login_role = app_role
+            st.session_state.plan_expiry = plan_expiry
+            st.rerun()
+        else:
+            st.error("Username or password is incorrect.")
+    st.stop()
+
+
 st.markdown('''
 <style>
 header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stSidebarCollapsedControl"], #MainMenu, footer{display:none!important}
@@ -363,11 +485,29 @@ div[data-testid="stTextArea"] textarea{
 </style>
 ''', unsafe_allow_html=True)
 
+require_login()
+
 for k, v in {'srt_text':'', 'translated_srt':'', 'generated_audio':False, 'show_video_preview':False, 'audio_bytes':None}.items():
     st.session_state.setdefault(k, v)
 
 with st.sidebar:
-    st.markdown('''<div class="profile-card"><h2>🎬 AI KHEMRA BRO</h2><div>REAL WORKFLOW MODE</div><div>Video → SRT → Khmer → MP3</div></div>''', unsafe_allow_html=True)
+    days_left = plan_days_left(st.session_state.get("plan_expiry", ""))
+    st.markdown(
+        f'''<div class="profile-card">
+        <h2>👋 {st.session_state.get("login_username", "User")}</h2>
+        <div>ROLE: {st.session_state.get("login_role", "USER")}</div>
+        <div>🗓️ PLAN: {st.session_state.get("plan_expiry", "-")}</div>
+        <div><b>⌛ {days_left} DAYS LEFT</b></div>
+        </div>''',
+        unsafe_allow_html=True,
+    )
+    if st.button("🚪 Logout", key="logout_button"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+    if days_left <= 0:
+        st.error("Your plan has expired. Please contact the owner.")
+        st.stop()
     st.markdown('---')
     st.subheader('📶 Mobile Internet Mode')
     lite_4g = st.toggle(
@@ -382,15 +522,30 @@ with st.sidebar:
     target_language = st.selectbox('ជ្រើសរើសភាសា (Select Language):', ['Khmer (ខ្មែរ)','English','Thai','Vietnamese'])
     st.markdown('---')
     st.subheader('🔑 API Keys Manager')
-    api_keys = st.text_area('Paste Gemini API Keys (One per line)', height=120)
+    server_key = get_secret("GEMINI_API_KEY")
+    if server_key:
+        st.success("✅ Server Gemini API Key connected")
+    else:
+        st.warning("⚠️ GEMINI_API_KEY is missing from Railway Variables")
+    api_keys = st.text_area(
+        'Optional backup Gemini API Keys (One per line)',
+        height=120,
+        help='Leave empty when the server key is configured.'
+    )
     valid_keys = [x.strip() for x in api_keys.splitlines() if x.strip()]
-    if valid_keys: st.success(f'✅ កំពុងប្រើប្រាស់ {len(valid_keys)} Keys')
+    if server_key:
+        valid_keys.insert(0, server_key)
+    valid_keys = list(dict.fromkeys(valid_keys))
+    if valid_keys:
+        st.success(f'✅ កំពុងប្រើប្រាស់ {len(valid_keys)} Key(s)')
     st.markdown('---')
     st.subheader('🎭 Translation Style')
-    st.radio('ជ្រើសរើសទម្រង់បកប្រែ:', ['Chinese Drama Pro (សម្រាប់រឿងចិន)','100% Audio Sync (កំណត់ពេលត្រូវគ្នា)','Standard (ការបកប្រែធម្មតា)'])
+    translation_style_label = st.radio('ជ្រើសរើសទម្រង់បកប្រែ:', ['Chinese Drama Pro (សម្រាប់រឿងចិន)','100% Audio Sync (កំណត់ពេលត្រូវគ្នា)','Standard (ការបកប្រែធម្មតា)'])
+    translation_style = translation_style_label.split(' (', 1)[0]
     st.markdown('---')
     st.subheader('⚙️ Audio Sync Mode')
-    st.radio('កែតម្រូវល្បឿន:', ['Speed Up Only (លឿន)','Speed Up & Slow Down (លឿន និង យឺត)'])
+    sync_mode_label = st.radio('កែតម្រូវល្បឿន:', ['Speed Up Only (លឿន)','Speed Up & Slow Down (លឿន និង យឺត)'])
+    sync_mode = sync_mode_label.split(' (', 1)[0]
     st.markdown('---')
     st.subheader('🗣️ Voice Mode (របៀបសំឡេង)')
     voice_mode = st.radio(
@@ -473,11 +628,11 @@ with tab1:
                     box.markdown(f'<div class="status-box">🌐 Translating SRT into {target_language}...</div>', unsafe_allow_html=True)
                     if target_language.startswith('Khmer'):
                         st.session_state.srt_text = translate_srt_with_gemini(
-                            original_srt, valid_keys, gemini_model, 'natural spoken Khmer'
+                            original_srt, valid_keys, gemini_model, 'natural spoken Khmer', translation_style
                         )
                     else:
                         st.session_state.srt_text = translate_srt_with_gemini(
-                            original_srt, valid_keys, gemini_model, target_language
+                            original_srt, valid_keys, gemini_model, target_language, translation_style
                         )
                     progress.progress(100)
                     box.markdown('<div class="success-box">✅ Real SRT generation complete.</div>', unsafe_allow_html=True)
@@ -508,6 +663,7 @@ with tab1:
                     st.session_state.audio_bytes = generate_dubbed_mp3(
                         st.session_state.srt_text,
                         voice_mode,
+                        sync_mode,
                     )
                 st.session_state.generated_audio = True
                 st.success('✅ បង្កើតសំឡេង MP3 ពិតរួចរាល់។')
@@ -545,7 +701,7 @@ with tab2:
                 with st.spinner('Gemini កំពុងបកប្រែ SRT ពិត...'):
                     language_name = 'natural spoken Khmer' if target_language.startswith('Khmer') else target_language
                     st.session_state.translated_srt = translate_srt_with_gemini(
-                        src, valid_keys, gemini_model, language_name
+                        src, valid_keys, gemini_model, language_name, translation_style
                     )
                 st.success('✅ បកប្រែ SRT រួចរាល់។')
             except Exception as exc:
@@ -577,7 +733,7 @@ with tab3:
         else:
             try:
                 with st.spinner('កំពុងបង្កើតសំឡេង Piseth និង Sreymom...'):
-                    speech_audio = generate_dubbed_mp3(speech, voice_mode)
+                    speech_audio = generate_dubbed_mp3(speech, voice_mode, sync_mode)
                 st.session_state.tab3_audio = speech_audio
                 st.success('✅ បង្កើតសំឡេងរួចរាល់។')
             except Exception as exc:
