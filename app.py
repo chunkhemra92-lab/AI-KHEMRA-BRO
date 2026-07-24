@@ -20,7 +20,7 @@ with st.sidebar:
     target_language = st.selectbox('ជ្រើសរើសភាសា (Select Language):', ['Khmer (ខ្មែរ)','English','Thai','Vietnamese'])
     st.markdown('---')
     st.subheader('🔑 API Keys Manager')
-    api_keys = st.text_area('Paste Gemini API Keys (One per line)', height=120, type='password')
+    api_keys = st.text_area('Paste Gemini API Keys (One per line)', height=120)
     valid_keys = [x.strip() for x in api_keys.splitlines() if x.strip()]
     if valid_keys: st.success(f'✅ កំពុងប្រើប្រាស់ {len(valid_keys)} Keys')
     st.markdown('---')
