@@ -1,7 +1,166 @@
+import asyncio
+import io
+import re
+import tempfile
 import time
+from pathlib import Path
+
+import edge_tts
 import streamlit as st
+from pydub import AudioSegment
 
 st.set_page_config(page_title='AI KHEMRA BRO', page_icon='🎬', layout='wide', initial_sidebar_state='expanded')
+
+
+MALE_VOICE = "km-KH-PisethNeural"
+FEMALE_VOICE = "km-KH-SreymomNeural"
+
+
+def parse_srt_blocks(srt_text: str) -> list[dict]:
+    """Parse SRT and return start/end milliseconds, speaker tag and clean text."""
+    blocks = re.split(r"\n\s*\n", srt_text.strip())
+    items = []
+
+    time_pattern = re.compile(
+        r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*"
+        r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})"
+    )
+
+    def to_ms(h: str, m: str, s: str, ms: str) -> int:
+        return ((int(h) * 60 + int(m)) * 60 + int(s)) * 1000 + int(ms)
+
+    for block in blocks:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if len(lines) < 2:
+            continue
+
+        time_index = next((i for i, line in enumerate(lines) if "-->" in line), None)
+        if time_index is None:
+            continue
+
+        match = time_pattern.search(lines[time_index])
+        if not match:
+            continue
+
+        start_ms = to_ms(*match.groups()[:4])
+        end_ms = to_ms(*match.groups()[4:])
+        dialogue = " ".join(lines[time_index + 1:]).strip()
+
+        speaker = "M"
+        tag_match = re.match(
+            r"^\s*\[(M|F|BOY|GIRL|OLD_M|OLD_F|M_THINK|F_THINK)\]\s*",
+            dialogue,
+            flags=re.I,
+        )
+        if tag_match:
+            speaker = tag_match.group(1).upper()
+            dialogue = dialogue[tag_match.end():].strip()
+
+        # Also support dubbing XML tags.
+        voice_match = re.search(r'<dubbing\s+voice="([^"]+)">', dialogue, flags=re.I)
+        if voice_match:
+            voice_name = voice_match.group(1)
+            speaker = "F" if "Sreymom" in voice_name else "M"
+            dialogue = re.sub(r"</?dubbing[^>]*>", "", dialogue, flags=re.I).strip()
+
+        if dialogue:
+            items.append(
+                {
+                    "start_ms": start_ms,
+                    "end_ms": end_ms,
+                    "speaker": speaker,
+                    "text": dialogue,
+                }
+            )
+
+    return items
+
+
+def run_async(coro):
+    """Run an async coroutine safely inside Streamlit."""
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
+VOICE_PROFILES = {
+    # Normal dialogue
+    "M":       {"voice": MALE_VOICE,   "rate": "+0%",  "pitch": "+0Hz",  "volume": "+0%"},
+    "F":       {"voice": FEMALE_VOICE, "rate": "+0%",  "pitch": "+0Hz",  "volume": "+0%"},
+
+    # Children: simulated using faster rate and higher pitch
+    "BOY":     {"voice": MALE_VOICE,   "rate": "+8%",  "pitch": "+25Hz", "volume": "+0%"},
+    "GIRL":    {"voice": FEMALE_VOICE, "rate": "+8%",  "pitch": "+28Hz", "volume": "+0%"},
+
+    # Elderly: simulated using slower rate and lower pitch
+    "OLD_M":   {"voice": MALE_VOICE,   "rate": "-12%", "pitch": "-18Hz", "volume": "-2%"},
+    "OLD_F":   {"voice": FEMALE_VOICE, "rate": "-12%", "pitch": "-15Hz", "volume": "-2%"},
+
+    # Inner thoughts: softer, slower and slightly lower
+    "M_THINK": {"voice": MALE_VOICE,   "rate": "-8%",  "pitch": "-8Hz",  "volume": "-12%"},
+    "F_THINK": {"voice": FEMALE_VOICE, "rate": "-8%",  "pitch": "-6Hz",  "volume": "-12%"},
+}
+
+
+async def synthesize_one(
+    text: str,
+    profile: dict,
+    output_path: str,
+) -> None:
+    communicate = edge_tts.Communicate(
+        text=text,
+        voice=profile["voice"],
+        rate=profile["rate"],
+        volume=profile["volume"],
+        pitch=profile["pitch"],
+    )
+    await communicate.save(output_path)
+
+
+def fit_audio_to_slot(audio: AudioSegment, target_ms: int) -> AudioSegment:
+    """Trim long clips gently. Keep short clips unchanged."""
+    if target_ms <= 0:
+        return audio
+    if len(audio) > target_ms:
+        return audio[:target_ms]
+    return audio
+
+
+def generate_dubbed_mp3(srt_text: str, voice_mode: str) -> bytes:
+    """Generate one timed MP3 using Piseth and Sreymom voices."""
+    segments = parse_srt_blocks(srt_text)
+    if not segments:
+        raise ValueError("រកមិនឃើញ SRT ដែលមាន timestamp ត្រឹមត្រូវទេ។")
+
+    total_ms = max(item["end_ms"] for item in segments) + 500
+    combined = AudioSegment.silent(duration=total_ms)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        for index, item in enumerate(segments, start=1):
+            if voice_mode.startswith("All Male"):
+                profile = VOICE_PROFILES["M"]
+            elif voice_mode.startswith("All Female"):
+                profile = VOICE_PROFILES["F"]
+            else:
+                profile = VOICE_PROFILES.get(item["speaker"], VOICE_PROFILES["M"])
+
+            clip_path = temp_path / f"segment_{index:04d}.mp3"
+            run_async(synthesize_one(item["text"], profile, str(clip_path)))
+
+            clip = AudioSegment.from_file(clip_path, format="mp3")
+            slot_ms = max(100, item["end_ms"] - item["start_ms"])
+            clip = fit_audio_to_slot(clip, slot_ms)
+            combined = combined.overlay(clip, position=item["start_ms"])
+
+        output = io.BytesIO()
+        combined.export(output, format="mp3", bitrate="128k")
+        return output.getvalue()
 
 st.markdown('''
 <style>
@@ -21,7 +180,7 @@ div[data-testid="stTextArea"] textarea{
 </style>
 ''', unsafe_allow_html=True)
 
-for k, v in {'srt_text':'', 'generated_audio':False, 'show_video_preview':False}.items():
+for k, v in {'srt_text':'', 'generated_audio':False, 'show_video_preview':False, 'audio_bytes':None}.items():
     st.session_state.setdefault(k, v)
 
 with st.sidebar:
@@ -52,7 +211,15 @@ with st.sidebar:
     st.radio('កែតម្រូវល្បឿន:', ['Speed Up Only (លឿន)','Speed Up & Slow Down (លឿន និង យឺត)'])
     st.markdown('---')
     st.subheader('🗣️ Voice Mode (របៀបសំឡេង)')
-    st.radio('កំណត់សម្រាប់ Tab 1 និង Tab 2:', ['Auto (ប្រុស/ស្រី តាម Tag)','All Male (ប្រុសសុទ្ធ)','All Female (ស្រីសុទ្ធ)'])
+    voice_mode = st.radio(
+        'កំណត់សម្រាប់ Tab 1 និង Tab 2:',
+        ['Auto (បែងចែកតាម Tag)','All Male (ប្រុសសុទ្ធ)','All Female (ស្រីសុទ្ធ)']
+    )
+    st.caption(
+        'Tags: [M] ប្រុស • [F] ស្រី • [BOY] ក្មេងប្រុស • [GIRL] ក្មេងស្រី • '
+        '[OLD_M] បុរសចាស់ • [OLD_F] ស្ត្រីចាស់ • '
+        '[M_THINK] ប្រុសគិតក្នុងចិត្ត • [F_THINK] ស្រីគិតក្នុងចិត្ត'
+    )
     st.markdown('---')
     st.subheader('🧠 AI Model (ម៉ូឌែល AI)')
     st.selectbox('ជ្រើសរើសម៉ូឌែល (Select Model):', ['gemini-2.5-flash','gemini-2.5-pro','gemini-2.0-flash'])
@@ -129,12 +296,20 @@ with tab1:
 [M] ក្រោកឡើង! ពេលនេះយើងត្រូវចេញដំណើរហើយ។
 
 2
-00:00:03,209 --> 00:00:06,500
-[M] ទោះបីជាមានឧបសគ្គយ៉ាងណា ក៏យើងមិនអាចបោះបង់បានទេ។
+00:00:03,209 --> 00:00:05,800
+[F] ខ្ញុំត្រៀមខ្លួនរួចហើយ។
 
 3
-00:00:09,324 --> 00:00:13,500
-[F] ខ្ញុំជឿថា ប្រសិនបើយើងរួមដៃគ្នា យើងនឹងអាចឈ្នះបាន។
+00:00:06,100 --> 00:00:08,500
+[BOY] លោកតា ខ្ញុំទៅជាមួយបានទេ?
+
+4
+00:00:08,800 --> 00:00:11,500
+[OLD_M] បានចៅ ប៉ុន្តែត្រូវប្រយ័ត្នខ្លួន។
+
+5
+00:00:11,800 --> 00:00:14,500
+[F_THINK] តើរឿងនេះនឹងបញ្ចប់យ៉ាងដូចម្តេច?
 '''
                 box.markdown(
                     '<div class="success-box">✅ SRT Generation Complete!</div>',
@@ -160,24 +335,34 @@ with tab1:
         st.header('2️⃣ AI Dubbing (Edge TTS Studio)')
 
         if st.button('🎙️ Generate Dubbed Audio (MP3)', key='audio'):
-            with st.spinner('កំពុងបង្កើតសំឡេងខ្មែរ...'):
-                time.sleep(1)
-            st.session_state.generated_audio = True
-            st.success(
-                '✅ Audio workflow is ready. '
-                'Connect Edge TTS logic to export the real MP3.'
-            )
+            try:
+                with st.spinner('កំពុងបង្កើតសំឡេង Piseth និង Sreymom...'):
+                    st.session_state.audio_bytes = generate_dubbed_mp3(
+                        st.session_state.srt_text,
+                        voice_mode,
+                    )
+                st.session_state.generated_audio = True
+                st.success('✅ បង្កើតសំឡេង MP3 ពិតរួចរាល់។')
+            except Exception as exc:
+                st.session_state.generated_audio = False
+                st.session_state.audio_bytes = None
+                st.error(f'❌ មិនអាចបង្កើតសំឡេងបាន៖ {exc}')
 
-    if st.session_state.generated_audio:
-        st.info(
-            'UI បានត្រៀមរួច។ '
-            'ផ្នែកនេះជាកន្លែងភ្ជាប់ Edge TTS សម្រាប់បង្កើត MP3 ពិត។'
+    if st.session_state.generated_audio and st.session_state.audio_bytes:
+        st.audio(st.session_state.audio_bytes, format='audio/mp3')
+        st.download_button(
+            '⬇️ Download Dubbed MP3',
+            data=st.session_state.audio_bytes,
+            file_name='khmer_dubbed_audio.mp3',
+            mime='audio/mpeg',
+            key='download_dubbed_mp3',
         )
 
     if uploaded_video is not None or st.session_state.srt_text:
         if st.button('🗑️ សម្អាត (Clear Video Project)', key='clear'):
             st.session_state.srt_text = ''
             st.session_state.generated_audio = False
+            st.session_state.audio_bytes = None
             st.session_state.show_video_preview = False
             st.rerun()
 
@@ -190,9 +375,30 @@ with tab2:
 
 with tab3:
     st.header('📜 Subtitle to Speech')
-    speech=st.text_area('Paste Khmer SRT with [M] / [F] tags', height=360)
-    st.selectbox('Male Voice',['km-KH-PisethNeural']); st.selectbox('Female Voice',['km-KH-SreymomNeural'])
+    speech = st.text_area('Paste Khmer SRT with character tags', height=360)
+    st.selectbox('Male Voice', [MALE_VOICE])
+    st.selectbox('Female Voice', [FEMALE_VOICE])
+
     if st.button('🎧 Create Speech Audio', key='speech'):
-        st.success('✅ Speech generation UI is ready for Edge TTS integration.') if speech.strip() else st.warning('សូមបញ្ចូល SRT ជាមុនសិន។')
+        if not speech.strip():
+            st.warning('សូមបញ្ចូល SRT ជាមុនសិន។')
+        else:
+            try:
+                with st.spinner('កំពុងបង្កើតសំឡេង Piseth និង Sreymom...'):
+                    speech_audio = generate_dubbed_mp3(speech, voice_mode)
+                st.session_state.tab3_audio = speech_audio
+                st.success('✅ បង្កើតសំឡេងរួចរាល់។')
+            except Exception as exc:
+                st.error(f'❌ មិនអាចបង្កើតសំឡេងបាន៖ {exc}')
+
+    if st.session_state.get('tab3_audio'):
+        st.audio(st.session_state.tab3_audio, format='audio/mp3')
+        st.download_button(
+            '⬇️ Download Speech MP3',
+            data=st.session_state.tab3_audio,
+            file_name='subtitle_to_speech.mp3',
+            mime='audio/mpeg',
+            key='download_tab3_mp3',
+        )
 
 st.markdown('<p class="small-note">AI-KHEMRA-BRO • Mobile-first Streamlit interface</p>', unsafe_allow_html=True)
