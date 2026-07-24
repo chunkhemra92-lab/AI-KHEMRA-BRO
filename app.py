@@ -1,13 +1,12 @@
 import asyncio
-import io
 import re
+import subprocess
 import tempfile
 import time
 from pathlib import Path
 
 import edge_tts
 import streamlit as st
-from pydub import AudioSegment
 
 st.set_page_config(page_title='AI KHEMRA BRO', page_icon='🎬', layout='wide', initial_sidebar_state='expanded')
 
@@ -121,26 +120,22 @@ async def synthesize_one(
     await communicate.save(output_path)
 
 
-def fit_audio_to_slot(audio: AudioSegment, target_ms: int) -> AudioSegment:
-    """Trim long clips gently. Keep short clips unchanged."""
-    if target_ms <= 0:
-        return audio
-    if len(audio) > target_ms:
-        return audio[:target_ms]
-    return audio
-
-
 def generate_dubbed_mp3(srt_text: str, voice_mode: str) -> bytes:
-    """Generate one timed MP3 using Piseth and Sreymom voices."""
+    """
+    Generate one synchronized MP3 with FFmpeg.
+
+    This version does not use pydub/audioop, so it works with the newer
+    Python runtime used by Streamlit Community Cloud.
+    """
     segments = parse_srt_blocks(srt_text)
     if not segments:
         raise ValueError("រកមិនឃើញ SRT ដែលមាន timestamp ត្រឹមត្រូវទេ។")
 
     total_ms = max(item["end_ms"] for item in segments) + 500
-    combined = AudioSegment.silent(duration=total_ms)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
+        clip_paths = []
 
         for index, item in enumerate(segments, start=1):
             if voice_mode.startswith("All Male"):
@@ -152,15 +147,67 @@ def generate_dubbed_mp3(srt_text: str, voice_mode: str) -> bytes:
 
             clip_path = temp_path / f"segment_{index:04d}.mp3"
             run_async(synthesize_one(item["text"], profile, str(clip_path)))
+            clip_paths.append(clip_path)
 
-            clip = AudioSegment.from_file(clip_path, format="mp3")
-            slot_ms = max(100, item["end_ms"] - item["start_ms"])
-            clip = fit_audio_to_slot(clip, slot_ms)
-            combined = combined.overlay(clip, position=item["start_ms"])
+        output_path = temp_path / "khmer_dubbed_audio.mp3"
 
-        output = io.BytesIO()
-        combined.export(output, format="mp3", bitrate="128k")
-        return output.getvalue()
+        command = ["ffmpeg", "-y"]
+        for clip_path in clip_paths:
+            command.extend(["-i", str(clip_path)])
+
+        filters = []
+        labels = []
+
+        for index, item in enumerate(segments):
+            slot_seconds = max(0.10, (item["end_ms"] - item["start_ms"]) / 1000)
+            delay_ms = max(0, item["start_ms"])
+            label = f"a{index}"
+            filters.append(
+                f"[{index}:a]"
+                f"atrim=0:{slot_seconds:.3f},"
+                f"asetpts=PTS-STARTPTS,"
+                f"adelay={delay_ms}|{delay_ms}"
+                f"[{label}]"
+            )
+            labels.append(f"[{label}]")
+
+        total_seconds = total_ms / 1000
+        filters.append(
+            "".join(labels)
+            + f"amix=inputs={len(labels)}:duration=longest:dropout_transition=0,"
+              f"apad=whole_dur={total_seconds:.3f},"
+              f"atrim=0:{total_seconds:.3f}"
+              "[mixed]"
+        )
+
+        command.extend(
+            [
+                "-filter_complex",
+                ";".join(filters),
+                "-map",
+                "[mixed]",
+                "-ac",
+                "2",
+                "-ar",
+                "44100",
+                "-b:a",
+                "128k",
+                str(output_path),
+            ]
+        )
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+        if result.returncode != 0:
+            error_text = result.stderr[-1500:] if result.stderr else "FFmpeg failed."
+            raise RuntimeError(error_text)
+
+        return output_path.read_bytes()
 
 st.markdown('''
 <style>
