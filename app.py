@@ -110,7 +110,7 @@ def translate_srt_with_gemini(srt_text: str, api_keys: list[str], model_name: st
         env_key = os.getenv("GEMINI_API_KEY", "").strip()
         api_keys = [env_key] if env_key else []
     if not api_keys:
-        raise ValueError("Please enter a Gemini API key in the sidebar.")
+        raise ValueError("GEMINI_API_KEY is missing in Railway Variables.")
 
     prompt = f"""You are a professional subtitle translator.
 Translate the following SRT into {target_language}.
@@ -363,7 +363,7 @@ div[data-testid="stTextArea"] textarea{
 </style>
 ''', unsafe_allow_html=True)
 
-for k, v in {'srt_text':'', 'translated_srt':'', 'generated_audio':False, 'show_video_preview':False, 'audio_bytes':None}.items():
+for k, v in {'srt_text':'', 'translated_srt':'', 'generated_audio':False, 'show_video_preview':False, 'audio_bytes':None, 'tab3_audio':None}.items():
     st.session_state.setdefault(k, v)
 
 with st.sidebar:
@@ -381,10 +381,14 @@ with st.sidebar:
     st.subheader('🌍 Target Language (ភាសាបកប្រែ)')
     target_language = st.selectbox('ជ្រើសរើសភាសា (Select Language):', ['Khmer (ខ្មែរ)','English','Thai','Vietnamese'])
     st.markdown('---')
-    st.subheader('🔑 API Keys Manager')
-    api_keys = st.text_area('Paste Gemini API Keys (One per line)', height=120)
-    valid_keys = [x.strip() for x in api_keys.splitlines() if x.strip()]
-    if valid_keys: st.success(f'✅ កំពុងប្រើប្រាស់ {len(valid_keys)} Keys')
+    st.subheader('⚙️ AI Settings')
+    railway_api_key = os.getenv('GEMINI_API_KEY', '').strip()
+    valid_keys = [railway_api_key] if railway_api_key else []
+    if railway_api_key:
+        st.success('✅ Gemini API Key connected from Railway')
+        st.caption('API Key ត្រូវបានលាក់នៅលើ Server។ អ្នកប្រើមិនអាចមើលឃើញបានទេ។')
+    else:
+        st.error('❌ GEMINI_API_KEY មិនទាន់បានដាក់នៅ Railway Variables ទេ។')
     st.markdown('---')
     st.subheader('🎭 Translation Style')
     st.radio('ជ្រើសរើសទម្រង់បកប្រែ:', ['Chinese Drama Pro (សម្រាប់រឿងចិន)','100% Audio Sync (កំណត់ពេលត្រូវគ្នា)','Standard (ការបកប្រែធម្មតា)'])
