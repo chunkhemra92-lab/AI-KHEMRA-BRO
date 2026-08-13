@@ -926,8 +926,8 @@ def upload_for_context(client, video_path):
 def parse_json_array(raw_text):
     import json
     cleaned = (raw_text or "").strip()
-    cleaned = re.sub(r"^```(?:json)?\\s*", "", cleaned, flags=re.I)
-    cleaned = re.sub(r"\\s*```$", "", cleaned)
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
     left, right = cleaned.find("["), cleaned.rfind("]")
     if left == -1 or right == -1 or right <= left:
         raise ValueError("AI មិនបានត្រឡប់ JSON ត្រឹមត្រូវ។")
@@ -1173,72 +1173,8 @@ def friendly_ai_error(exc, key_count=1):
         )
     if is_invalid_key_error(exc):
         return "Gemini API Key មិនត្រឹមត្រូវ ឬមិនមានសិទ្ធិប្រើ។ សូមដាក់សោថ្មី ហើយចុច «រក្សាទុក»។"
-    message = re.sub(r"https?://\\S+", "", str(exc))
+    message = re.sub(r"https?://\S+", "", str(exc))
     return f"AI មិនអាចបញ្ចប់ការបកប្រែបាន៖ {message[:420]}"
-
-
-def video_to_srt(video_path, api_keys, model):
-    """
-    Whisper creates timestamps once.
-    Gemini keys rotate automatically when a key has quota/rate-limit problems.
-    The normal path uses one translation pass plus targeted repair only,
-    reducing Gemini requests compared with the previous three-pass workflow.
-    """
-    if isinstance(api_keys, str):
-        api_keys = [api_keys]
-    api_keys = [str(key).strip() for key in api_keys if str(key).strip()]
-    if not api_keys:
-        raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
-
-    with tempfile.TemporaryDirectory() as folder:
-        folder_path = Path(folder)
-        proxy_path = folder_path / "video_proxy_480p.mp4"
-        audio_path = folder_path / "audio_16k.flac"
-
-        # Convert the large MP4 into a small processing copy. The original file
-        # is used only as a fallback when FFmpeg cannot create the proxy.
-        processing_video = Path(video_path)
-        try:
-            processing_video = optimize_video_for_processing(video_path, proxy_path)
-        except Exception:
-            processing_video = Path(video_path)
-
-        extract_audio(processing_video, audio_path)
-        cues = transcribe_with_whisper(audio_path)
-        if not cues:
-            raise RuntimeError("Whisper មិនរកឃើញសំឡេងនិយាយក្នុងវីដេអូនេះទេ។")
-
-        last_error = None
-
-        for api_key in api_keys:
-            try:
-                client = genai.Client(api_key=api_key)
-                uploaded_video = upload_for_context(client, processing_video)
-
-                # One main translation pass. translate_cues already repairs
-                # missing/Chinese cues, so the old extra full refinement pass
-                # is skipped to conserve free-tier requests.
-                translated = translate_cues(
-                    client, model, uploaded_video, cues
-                )
-                translated = repair_translation_items(
-                    client, model, uploaded_video, cues, translated
-                )
-
-                result = build_srt(cues, translated)
-                if "-->" not in result:
-                    raise RuntimeError("មិនអាចបង្កើត Khmer SRT បានទេ។")
-                return result
-
-            except Exception as exc:
-                last_error = exc
-                if is_quota_error(exc) or is_invalid_key_error(exc):
-                    # Try the next API key saved by this user.
-                    continue
-                raise RuntimeError(friendly_ai_error(exc, len(api_keys))) from exc
-
-        raise RuntimeError(friendly_ai_error(last_error, len(api_keys)))
-
 
 
 # ---------------------------------------------------------------------------
