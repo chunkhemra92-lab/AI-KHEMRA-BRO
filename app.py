@@ -21,7 +21,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.2"
+APP_VERSION = "6.3"
 
 st.set_page_config(page_title='AI KHEMRA BRO', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -392,7 +392,151 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   .social-split a{min-height:64px;gap:8px}
   .social-icon{width:37px;height:37px;flex-basis:37px;font-size:25px}
 }
+	
+/* ───────────── Universal mobile resilience patch ───────────── */
+/* This layer protects 320 px–wide phones, modern notched devices, and
+   landscape keyboards without changing the desktop workspace. */
+*, *::before, *::after{box-sizing:border-box}
+html{
+  width:100%;max-width:100%;overflow-x:hidden;
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+}
+body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .stApp{
+  width:100%;max-width:100%;min-width:0;overflow-x:hidden;
+}
+[data-testid="stMainBlockContainer"], .block-container{
+  min-width:0;max-width:100%;
+  padding-bottom:max(2.5rem, env(safe-area-inset-bottom));
+}
+button, input, textarea, select{font:inherit}
+button, a, [role="button"]{touch-action:manipulation}
+[data-testid="stAudio"] audio,
+[data-testid="stVideo"] video,
+[data-testid="stFileUploader"],
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stTextArea"],
+[data-testid="stTextInput"],
+[data-testid="stSelectbox"],
+[data-testid="stDownloadButton"],
+.stButton{width:100%;max-width:100%;min-width:0}
+[data-testid="stAudio"] audio,
+[data-testid="stVideo"] video{display:block;max-width:100%;height:auto}
 
+@media (max-width:700px){
+  /* Keep content clear of the fixed menu controls and the phone safe areas. */
+  [data-testid="stMainBlockContainer"], .block-container{
+    padding-top:max(.45rem, env(safe-area-inset-top))!important;
+    padding-right:max(.7rem, env(safe-area-inset-right))!important;
+    padding-bottom:max(2.8rem, env(safe-area-inset-bottom))!important;
+    padding-left:max(.7rem, env(safe-area-inset-left))!important;
+  }
+  .hero{
+    margin-top:44px!important;
+    padding:22px 10px 20px!important;
+    border-radius:16px!important;
+  }
+  .hero h1{
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    font-size:clamp(25px,8.5vw,38px)!important;
+    line-height:1.12!important;
+  }
+  .hero p{overflow-wrap:anywhere!important;word-break:normal!important}
+  .section-title{
+    font-size:clamp(21px,6.5vw,27px)!important;
+    line-height:1.25!important;
+    overflow-wrap:anywhere!important;
+  }
+  h1{font-size:clamp(25px,8vw,34px)!important;line-height:1.2!important}
+  h2{font-size:clamp(21px,6.5vw,28px)!important;line-height:1.25!important}
+  h3{font-size:clamp(18px,5.5vw,23px)!important;line-height:1.3!important}
+  p, li, [data-testid="stMarkdownContainer"]{overflow-wrap:anywhere}
+
+  /* Large, native-feeling controls prevent iOS browser zoom and missed taps. */
+  .stButton > button, .stDownloadButton > button,
+  [data-testid="stFormSubmitButton"] > button{
+    width:100%!important;min-height:48px!important;
+    padding:11px 12px!important;font-size:16px!important;
+    line-height:1.25!important;white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+  div[data-testid="stTextArea"] textarea,
+  div[data-testid="stTextInput"] input,
+  div[data-baseweb="base-input"] input,
+  div[data-baseweb="select"] > div{
+    font-size:16px!important; /* prevents automatic iOS zoom on focus */
+    min-height:48px!important;max-width:100%!important;
+  }
+  div[data-testid="stTextArea"] textarea{
+    min-height:150px!important;line-height:1.6!important;
+  }
+  [data-testid="stFileUploaderDropzone"]{
+    min-height:142px!important;padding:14px 10px!important;
+  }
+  [data-testid="stFileUploaderDropzone"] button{
+    min-height:44px!important;font-size:15px!important;
+  }
+
+  /* Four workflow tabs remain visible without horizontal clipping. */
+  div[data-baseweb="tab-list"]{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;padding:6px!important;
+    max-width:100%!important;
+  }
+  button[data-baseweb="tab"]{
+    width:100%!important;min-width:0!important;min-height:54px!important;
+    padding:8px 4px!important;font-size:12px!important;
+  }
+  button[data-baseweb="tab"] p,
+  button[data-baseweb="tab"] div{
+    min-width:0!important;white-space:normal!important;
+    overflow-wrap:anywhere!important;word-break:normal!important;
+    text-align:center!important;
+  }
+  [data-baseweb="tab-highlight"]{display:none!important}
+
+  /* Popover settings never exceed the visible width of a handset. */
+  div[data-baseweb="popover"]{
+    max-width:calc(100vw - 14px)!important;
+  }
+  div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{
+    width:min(92vw,390px)!important;min-width:0!important;max-width:92vw!important;
+  }
+  .st-key-api_menu_container{left:max(5px, env(safe-area-inset-left))!important}
+  .st-key-owner_trigger_container{right:max(5px, env(safe-area-inset-right))!important}
+
+  /* Wide utility components scroll inside themselves instead of moving the page. */
+  [data-testid="stDataFrame"], [data-testid="stTable"],
+  [data-testid="stCodeBlock"], [data-testid="stJson"]{
+    max-width:100%!important;overflow-x:auto!important;
+    -webkit-overflow-scrolling:touch;
+  }
+}
+
+@media (max-width:380px){
+  [data-testid="stMainBlockContainer"], .block-container{
+    padding-right:.5rem!important;padding-left:.5rem!important;
+  }
+  .hero{margin-top:42px!important;padding:18px 7px!important}
+  .hero h1{font-size:clamp(23px,8vw,30px)!important}
+  .hero p{font-size:10px!important;letter-spacing:.45px!important}
+  .section-title{font-size:21px!important}
+  div[data-baseweb="tab-list"]{gap:5px!important;padding:5px!important}
+  button[data-baseweb="tab"]{min-height:52px!important;font-size:11px!important}
+  .stButton > button, .stDownloadButton > button{font-size:15px!important}
+}
+
+@media (orientation:landscape) and (max-height:600px) and (max-width:950px){
+  [data-testid="stMainBlockContainer"], .block-container{
+    padding-top:.35rem!important;padding-bottom:1.2rem!important;
+  }
+  .hero{margin-top:40px!important;padding:14px 10px!important}
+  .hero h1{font-size:26px!important}
+  .hero p{font-size:10px!important}
+  button[data-baseweb="tab"]{min-height:44px!important}
+  .stButton > button, .stDownloadButton > button{min-height:44px!important}
+}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -926,8 +1070,8 @@ def upload_for_context(client, video_path):
 def parse_json_array(raw_text):
     import json
     cleaned = (raw_text or "").strip()
-    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.I)
-    cleaned = re.sub(r"\s*```$", "", cleaned)
+    cleaned = re.sub(r"^```(?:json)?\\s*", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\\s*```$", "", cleaned)
     left, right = cleaned.find("["), cleaned.rfind("]")
     if left == -1 or right == -1 or right <= left:
         raise ValueError("AI មិនបានត្រឡប់ JSON ត្រឹមត្រូវ។")
@@ -1173,8 +1317,72 @@ def friendly_ai_error(exc, key_count=1):
         )
     if is_invalid_key_error(exc):
         return "Gemini API Key មិនត្រឹមត្រូវ ឬមិនមានសិទ្ធិប្រើ។ សូមដាក់សោថ្មី ហើយចុច «រក្សាទុក»។"
-    message = re.sub(r"https?://\S+", "", str(exc))
+    message = re.sub(r"https?://\\S+", "", str(exc))
     return f"AI មិនអាចបញ្ចប់ការបកប្រែបាន៖ {message[:420]}"
+
+
+def video_to_srt(video_path, api_keys, model):
+    """
+    Whisper creates timestamps once.
+    Gemini keys rotate automatically when a key has quota/rate-limit problems.
+    The normal path uses one translation pass plus targeted repair only,
+    reducing Gemini requests compared with the previous three-pass workflow.
+    """
+    if isinstance(api_keys, str):
+        api_keys = [api_keys]
+    api_keys = [str(key).strip() for key in api_keys if str(key).strip()]
+    if not api_keys:
+        raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
+
+    with tempfile.TemporaryDirectory() as folder:
+        folder_path = Path(folder)
+        proxy_path = folder_path / "video_proxy_480p.mp4"
+        audio_path = folder_path / "audio_16k.flac"
+
+        # Convert the large MP4 into a small processing copy. The original file
+        # is used only as a fallback when FFmpeg cannot create the proxy.
+        processing_video = Path(video_path)
+        try:
+            processing_video = optimize_video_for_processing(video_path, proxy_path)
+        except Exception:
+            processing_video = Path(video_path)
+
+        extract_audio(processing_video, audio_path)
+        cues = transcribe_with_whisper(audio_path)
+        if not cues:
+            raise RuntimeError("Whisper មិនរកឃើញសំឡេងនិយាយក្នុងវីដេអូនេះទេ។")
+
+        last_error = None
+
+        for api_key in api_keys:
+            try:
+                client = genai.Client(api_key=api_key)
+                uploaded_video = upload_for_context(client, processing_video)
+
+                # One main translation pass. translate_cues already repairs
+                # missing/Chinese cues, so the old extra full refinement pass
+                # is skipped to conserve free-tier requests.
+                translated = translate_cues(
+                    client, model, uploaded_video, cues
+                )
+                translated = repair_translation_items(
+                    client, model, uploaded_video, cues, translated
+                )
+
+                result = build_srt(cues, translated)
+                if "-->" not in result:
+                    raise RuntimeError("មិនអាចបង្កើត Khmer SRT បានទេ។")
+                return result
+
+            except Exception as exc:
+                last_error = exc
+                if is_quota_error(exc) or is_invalid_key_error(exc):
+                    # Try the next API key saved by this user.
+                    continue
+                raise RuntimeError(friendly_ai_error(exc, len(api_keys))) from exc
+
+        raise RuntimeError(friendly_ai_error(last_error, len(api_keys)))
+
 
 
 # ---------------------------------------------------------------------------
