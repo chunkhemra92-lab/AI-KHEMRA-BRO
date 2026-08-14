@@ -1,4 +1,4 @@
-# AI KHEMRA BRO v6.6.9
+# AI KHEMRA BRO v6.7.0
 
 កម្មវិធី Streamlit សម្រាប់ទាញសំឡេងពីវីដេអូ បង្កើត SRT និង dubbing MP3។ អ្នកប្រើប្រាស់ម្នាក់ៗអាចជ្រើសភាសាគោលដៅដោយខ្លួនឯង៖ **Khmer (ខ្មែរ), English, Chinese (中文), Korean (한국어)** ឬ **Vietnamese (Tiếng Việt)**។ សំឡេង MP3 ប្រើ male/female voice ដែលត្រូវនឹងភាសាគោលដៅ និង tag `[M]`, `[F]`, `[M_THINK]`, `[F_THINK]`។
 
@@ -36,6 +36,12 @@ ADMIN_USERNAME = "KHEMRA"
 ចុច `☰` នៅផ្នែកខាងលើ រួចជ្រើស **Gemini Model**, **Target Language** និង **Translation Style**។ អ្នកអាចជ្រើស Khmer, English, Chinese, Korean ឬ Vietnamese សម្រាប់ទាំង Video → SRT, AI Subtitle Translator, SRT → Speech និង Text → Speech។ `Standard` សមស្របសម្រាប់ការបកប្រែទូទៅ ខណៈ `Lipsync` សរសេរឃ្លាខ្លីស៊ី timing សម្រាប់ dubbing។
 
 ជម្រើស Target Language, Model និង Translation Style ត្រូវបានអ៊ិនគ្រីប និងរក្សាទុកជាឯកជនតាម Access Code របស់អ្នកប្រើម្នាក់ៗ។ ដូច្នេះអ្នកប្រើ A អាចជ្រើស English ខណៈអ្នកប្រើ B ជ្រើស Khmer ដោយមិនប៉ះពាល់គ្នា។
+
+## SRT Timing និងស្លាកសំឡេងតួអង្គ
+
+កំណែ **v6.7.0** រក្សា **ID, ម៉ោង, នាទី, វិនាទី និង millisecond** របស់ SRT ដដែលក្នុង Video → SRT និង SRT Translator។ មុនបង្ហាញលទ្ធផល កម្មវិធីផ្ទៀងផ្ទាត់ថា cue មិនត្រូវបានប្ដូរលេខ ឬផ្លាស់ប្តូរ timestamp ទេ។ SRT ដែលមាន timestamp ចុងក្រោយតូចជាងពេលចាប់ផ្តើម នឹងបង្ហាញ error ជំនួសឱ្យកែពេលដោយស្ងាត់ៗ។
+
+សម្រាប់ Video → SRT កម្មវិធីបកប្រែអត្ថបទតាមភាសាគោលដៅដែលអ្នកជ្រើស រួចប្រើ video/audio context ដើម្បីបែងចែកស្លាក canonical ដោយស្វ័យប្រវត្តិ៖ `[M]`, `[F]`, `[M_THINK]` និង `[F_THINK]`។ សំឡេងគិតក្នុងចិត្តត្រូវប្រើតែពេលជាគំនិតខាងក្នុងពិត មិនមែនគ្រាន់តែសំឡេងស្រាល ឬសំឡេងឆ្ងាយទេ។ បើការវិភាគ video context ពី AI service មិនអាចប្រើបាន កម្មវិធីរក្សា SRT ដែលបានបកប្រែរួច និងអ្នកអាចចុច `🧠 កែ SRT` ដើម្បីព្យាយាមវិភាគស្លាកម្តងទៀត។
 
 ## Video Upload លឿន និងស្រាល
 
