@@ -24,7 +24,7 @@ from google import genai
 from google.genai import types
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.6.9"
+APP_VERSION = "6.7.0"
 
 st.set_page_config(page_title='AI KHEMRA BRO', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -811,6 +811,28 @@ preserve anger, threat, mockery, and emotion, but naturally replace profanity, s
 hateful language, degrading slurs, and unnecessarily graphic wording with clean spoken Khmer.
 Never invent an insult not present in the source. Return one JSON object for every supplied ID
 in the same order.
+""".strip()
+
+
+SPEAKER_TAG_PROMPT = """You are an audiovisual speaker-tagging editor for film subtitles.
+The video and fixed-timestamp transcript cues are supplied. Identify the person who is ACTUALLY speaking at each timestamp from audible voice, lip movement, scene context, and continuity across nearby cues.
+
+Return JSON only. Return one object for every supplied ID, in the same order:
+[{"id": 1, "tag": "M"}]
+
+Only these exact tags are allowed:
+- M: male dialogue spoken aloud.
+- F: female dialogue spoken aloud.
+- M_THINK: male inner thought that other characters cannot hear.
+- F_THINK: female inner thought that other characters cannot hear.
+
+Rules:
+- Never tag every cue M by default. Decide M or F from the real active speaker whenever the video/audio provides evidence.
+- Use THINK only for clear internal monologue, voice-over thought, or an unheard thought. A quiet, distant, crying, muffled, or off-screen spoken line is still ordinary M or F dialogue.
+- Keep the same speaking character on a consistent M or F tag across adjacent cues until the real speaker changes.
+- Do not tag the character merely visible on screen if another person is speaking off-camera.
+- Do not translate, shorten, rewrite, or return dialogue text. Return only id and tag for every cue.
+- Never change cue ID, cue order, start time, or end time.
 """.strip()
 
 
@@ -1838,6 +1860,38 @@ def refine_translated_cues(client, model_name, uploaded_video, cues, translated)
     return refined
 
 
+def classify_speaker_tags_from_video(client, model_name, uploaded_video, cues, translated):
+    """Use actual video/audio context to assign the four canonical dubbing tags.
+
+    Translation stays on the fast text path.  This focused second pass only returns
+    tags, so it cannot alter subtitle wording, IDs, or fixed timestamps.  If the
+    optional multimodal service is unavailable, the already-valid translation is
+    preserved rather than failing the entire customer job.
+    """
+    if uploaded_video is None:
+        return translated
+    tagged = {cue_id: dict(item) for cue_id, item in translated.items()}
+    for offset in range(0, len(cues), 32):
+        batch = cues[offset:offset + 32]
+        payload = "\n".join(
+            f'ID={cue["id"]} | TIME={seconds_to_srt(cue["start"])} --> '
+            f'{seconds_to_srt(cue["end"])} | SOURCE={cue["source"]}'
+            for cue in batch
+        )
+        response = gemini_generate_with_retry(
+            client, model_name, [uploaded_video, SPEAKER_TAG_PROMPT + "\n\nCUES:\n" + payload]
+        )
+        allowed_ids = {cue["id"] for cue in batch}
+        for row in parse_json_array(response.text or ""):
+            try:
+                cue_id = int(row.get("id"))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if cue_id in allowed_ids and cue_id in tagged:
+                tagged[cue_id]["tag"] = normalize_voice_tag(row.get("tag", tagged[cue_id].get("tag", "M")))
+    return tagged
+
+
 def translate_cues(client, model_name, uploaded_video, cues):
     """Translate in sequential batches while carrying recent character context."""
     result_by_id = {}
@@ -1897,6 +1951,18 @@ def translate_cues(client, model_name, uploaded_video, cues):
     return repair_translation_items(
         client, model_name, uploaded_video, cues, result_by_id
     )
+
+
+def assert_srt_timing_integrity(source_cues, output_srt):
+    """Verify that translation never renumbers or moves locked subtitle timings."""
+    rendered = srt_to_structured_cues(output_srt)
+    expected = [
+        (int(cue["id"]), int(round(float(cue["start"]) * 1000)), int(round(float(cue["end"]) * 1000)))
+        for cue in source_cues
+    ]
+    actual = [(int(cue["id"]), int(cue["start_ms"]), int(cue["end_ms"])) for cue in rendered]
+    if actual != expected:
+        raise RuntimeError("SRT timing ឬលេខ cue ត្រូវបានផ្លាស់ប្តូរ។ សូមសាកបកប្រែម្តងទៀត។")
 
 
 def build_srt(cues, translated):
@@ -2089,7 +2155,16 @@ def video_to_srt(video_path, api_keys, model, prepared_cues=None, source_languag
         for model_name in _candidate_gemini_models(model):
             try:
                 translated = translate_cues_text_only(client, model_name, cues, source_language, translation_style, target_language)
+                # Fast text translation preserves throughput. A focused video pass then
+                # assigns M/F/THINK from the actual active speaker without touching text
+                # or timestamps. If optional video context fails, keep the translated SRT.
+                try:
+                    video_context = upload_for_context(client, video_path)
+                    translated = classify_speaker_tags_from_video(client, model_name, video_context, cues, translated)
+                except Exception:
+                    pass
                 result = build_srt(cues, translated)
+                assert_srt_timing_integrity(cues, result)
                 if not result.strip() or "-->" not in result:
                     raise RuntimeError("មិនអាចបង្កើត SRT តាមភាសាដែលបានជ្រើសបានទេ។")
                 return result
@@ -2132,7 +2207,9 @@ def translate_srt_to_khmer(srt_text, api_keys, model, source_language="Auto-dete
         for model_name in _candidate_gemini_models(model):
             try:
                 translated = translate_cues_text_only(client, model_name, cues, source_language, translation_style, target_language)
-                return build_srt(cues, translated)
+                result = build_srt(cues, translated)
+                assert_srt_timing_integrity(cues, result)
+                return result
             except Exception as exc:
                 last_error = exc
                 if is_invalid_key_error(exc):
@@ -2147,13 +2224,13 @@ def srt_to_structured_cues(srt_text):
     parsed = parse_srt(srt_text)
     return [
         {
-            "id": index,
+            "id": cue["id"],
             "start_ms": cue["start"],
             "end_ms": cue["end"],
             "tag": cue["tag"],
             "text": cue["text"],
         }
-        for index, cue in enumerate(parsed, start=1)
+        for cue in parsed
     ]
 
 
@@ -2226,19 +2303,26 @@ def parse_srt(srt_text):
     def to_ms(v):
         h,m,s,ms=map(int,v); return ((h*60+m)*60+s)*1000+ms
     cues=[]
-    for block in re.split(r'\n\s*\n',srt_text.strip()):
+    for block_index, block in enumerate(re.split(r'\n\s*\n',srt_text.strip()), start=1):
         lines=[x.strip() for x in block.splitlines() if x.strip()]
         idx=next((i for i,x in enumerate(lines) if '-->' in x),None)
-        if idx is None or idx+1>=len(lines): continue
+        if idx is None or idx+1>=len(lines):
+            continue
         match=time_re.search(lines[idx])
-        if not match: continue
+        if not match:
+            raise ValueError(f"SRT timestamp មិនត្រឹមត្រូវនៅ block {block_index}។")
+        cue_id = block_index
+        if idx > 0 and lines[0].isdigit():
+            cue_id = int(lines[0])
         dialogue=' '.join(lines[idx+1:]).strip(); tag_match=tag_re.match(dialogue)
-        tag=tag_match.group(1).upper() if tag_match else 'M_ADULT'
-        if tag_match: dialogue=dialogue[tag_match.end():].strip()
+        tag=tag_match.group(1).upper() if tag_match else 'M'
+        if tag_match:
+            dialogue=dialogue[tag_match.end():].strip()
         if dialogue:
             start_ms=to_ms(match.groups()[:4]); end_ms=to_ms(match.groups()[4:])
-            if end_ms <= start_ms: end_ms = start_ms + 350
-            cues.append({'start':start_ms,'end':end_ms,'tag':tag,'text':dialogue})
+            if end_ms <= start_ms:
+                raise ValueError(f"SRT timestamp បញ្ចប់ត្រូវតែធំជាងពេលចាប់ផ្តើមនៅ cue {cue_id}។")
+            cues.append({'id': cue_id, 'start':start_ms,'end':end_ms,'tag':tag,'text':dialogue})
     return cues
 
 
@@ -4281,4 +4365,4 @@ with tab_text_speech:
             use_container_width=True,
         )
 
-st.caption("AI-KHEMRA-BRO v6.6.9 • Backup JSON Hotfix • Compact Video • Mobile-first")
+st.caption("AI-KHEMRA-BRO v6.7.0 • Locked Timing • Auto Speaker Tags • Mobile-first")
