@@ -1,8 +1,0 @@
-# Keep this file in the repository root beside app.py.
-# Streamlit Community Cloud installs every package listed here.
-streamlit==1.61.1
-google-genai==2.18.0
-edge-tts==7.2.8
-faster-whisper==1.2.1
-extra-streamlit-components==0.1.81
-cryptography==46.0.7
