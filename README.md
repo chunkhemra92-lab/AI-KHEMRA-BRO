@@ -1,6 +1,6 @@
-# AI KHEMRA BRO v6.6.3
+# AI KHEMRA BRO v6.6.5
 
-កម្មវិធី Streamlit សម្រាប់ទាញសំឡេងពីវីដេអូ បង្កើត SRT បកប្រែចិន/កូរ៉េ/វៀតណាម/អង់គ្លេសទៅខ្មែរ និងបង្កើតសំឡេង Khmer MP3 ជាមួយ tag `[M]`, `[F]`, `[M_THINK]`, `[F_THINK]`។
+កម្មវិធី Streamlit សម្រាប់ទាញសំឡេងពីវីដេអូ បង្កើត SRT និង dubbing MP3។ អ្នកប្រើប្រាស់ម្នាក់ៗអាចជ្រើសភាសាគោលដៅដោយខ្លួនឯង៖ **Khmer (ខ្មែរ), English, Chinese (中文), Korean (한국어)** ឬ **Vietnamese (Tiếng Việt)**។ សំឡេង MP3 ប្រើ male/female voice ដែលត្រូវនឹងភាសាគោលដៅ និង tag `[M]`, `[F]`, `[M_THINK]`, `[F_THINK]`។
 
 ## ឯកសារត្រូវ Upload ទៅ Streamlit Cloud
 
@@ -10,6 +10,7 @@
 | `requirements.txt` | Python dependencies ដែល Streamlit Cloud ត្រូវដំឡើង |
 | `packages.txt` | System dependency: `ffmpeg` |
 | `.gitignore` | ការពារ API key, license database និង temporary files មិនឱ្យចូល Git |
+| `README.md` | សេចក្តីណែនាំ deploy និងការជ្រើសភាសាគោលដៅ |
 
 ## Streamlit Secrets
 
@@ -28,11 +29,13 @@ ADMIN_USERNAME = "KHEMRA"
 
 ## ដាក់ដំណើរការ
 
-ដាក់ឯកសារ 4 ខាងលើនៅ root នៃ GitHub repository រួចភ្ជាប់ repository ទៅ Streamlit Community Cloud។ កំណត់ `app.py` ជា main file ហើយបញ្ចូល Secrets មុនចុច Reboot។
+ដាក់ឯកសារ 5 ខាងលើនៅ root នៃ GitHub repository រួចភ្ជាប់ repository ទៅ Streamlit Community Cloud។ កំណត់ `app.py` ជា main file ហើយបញ្ចូល Secrets មុនចុច Reboot។
 
 ## ការប្រើ Settings
 
-ចុច `☰` នៅផ្នែកខាងលើ រួចជ្រើស Gemini Model និង Translation Style។ `Standard` សមស្របសម្រាប់ការបកប្រែទូទៅ ខណៈ `Lipsync` សរសេរឃ្លាខ្លីស៊ី timing សម្រាប់ dubbing។ ការកំណត់នេះអនុវត្តទៅទាំង Video → SRT និង AI Subtitle Translator។
+ចុច `☰` នៅផ្នែកខាងលើ រួចជ្រើស **Gemini Model**, **Target Language** និង **Translation Style**។ អ្នកអាចជ្រើស Khmer, English, Chinese, Korean ឬ Vietnamese សម្រាប់ទាំង Video → SRT, AI Subtitle Translator, SRT → Speech និង Text → Speech។ `Standard` សមស្របសម្រាប់ការបកប្រែទូទៅ ខណៈ `Lipsync` សរសេរឃ្លាខ្លីស៊ី timing សម្រាប់ dubbing។
+
+ជម្រើស Target Language, Model និង Translation Style ត្រូវបានអ៊ិនគ្រីប និងរក្សាទុកជាឯកជនតាម Access Code របស់អ្នកប្រើម្នាក់ៗ។ ដូច្នេះអ្នកប្រើ A អាចជ្រើស English ខណៈអ្នកប្រើ B ជ្រើស Khmer ដោយមិនប៉ះពាល់គ្នា។
 
 ## មិនត្រូវ Upload
 
