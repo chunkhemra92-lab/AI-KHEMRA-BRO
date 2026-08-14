@@ -23,7 +23,7 @@ from google import genai
 from google.genai import types
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.6.3"
+APP_VERSION = "6.6.5"
 
 st.set_page_config(page_title='AI KHEMRA BRO', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -600,8 +600,11 @@ VOICE_PROFILES={
 'F_ADULT':{'voice':SREYMOM,'rate':'-2%','pitch':'-1Hz','volume':'+7%'},
 'M_OLD':{'voice':PISITH,'rate':'-11%','pitch':'-8Hz','volume':'+8%'},
 'F_OLD':{'voice':SREYMOM,'rate':'-10%','pitch':'-6Hz','volume':'+8%'},
-'M_THINK':{'voice':PISITH,'rate':'-5%','pitch':'-2Hz','volume':'-4%'},
-'F_THINK':{'voice':SREYMOM,'rate':'-5%','pitch':'-2Hz','volume':'-4%'},
+# Thought voices stay close to normal speech level, but use a gentler pace and
+# warmer tone.  This keeps them intimate and attractive without becoming weak,
+# hollow, whispery, or artificially echoing.
+'M_THINK':{'voice':PISITH,'rate':'-2%','pitch':'+0Hz','volume':'-2%'},
+'F_THINK':{'voice':SREYMOM,'rate':'-2%','pitch':'+1Hz','volume':'-2%'},
 'NARRATOR_M':{'voice':PISITH,'rate':'-7%','pitch':'-6Hz','volume':'+8%'},
 'NARRATOR_F':{'voice':SREYMOM,'rate':'-6%','pitch':'-4Hz','volume':'+8%'},
 # Backward-compatible labels for older SRT files.
@@ -673,7 +676,19 @@ GEMINI_MODEL_LABELS = {
     "gemini-3.1-flash-lite": "✨ gemini-3.1-flash-lite — លឿនខ្លាំង",
     "gemini-3.1-pro-preview": "🧠 gemini-3.1-pro-preview — ពិនិត្យជ្រាលជ្រៅ",
 }
-TARGET_LANGUAGE_OPTIONS = ("Khmer (ខ្មែរ)",)
+TARGET_LANGUAGE_OPTIONS = (
+    "Khmer (ខ្មែរ)", "English", "Chinese (中文)", "Korean (한국어)", "Vietnamese (Tiếng Việt)",
+)
+# Each selectable target has a matching male/female Edge voice.  This keeps the
+# generated SRT and its MP3 in the same language rather than sending non-Khmer
+# text to a Khmer-only voice.
+TARGET_LANGUAGE_SETTINGS = {
+    "Khmer (ខ្មែរ)": {"name": "Khmer", "sample": "ខ្មែរ", "male_voice": PISITH, "female_voice": SREYMOM, "khmer_only": True},
+    "English": {"name": "English", "sample": "English", "male_voice": "en-US-GuyNeural", "female_voice": "en-US-JennyNeural", "khmer_only": False},
+    "Chinese (中文)": {"name": "Simplified Chinese", "sample": "中文", "male_voice": "zh-CN-YunxiNeural", "female_voice": "zh-CN-XiaoxiaoNeural", "khmer_only": False},
+    "Korean (한국어)": {"name": "Korean", "sample": "한국어", "male_voice": "ko-KR-InJoonNeural", "female_voice": "ko-KR-SunHiNeural", "khmer_only": False},
+    "Vietnamese (Tiếng Việt)": {"name": "Vietnamese", "sample": "Tiếng Việt", "male_voice": "vi-VN-NamMinhNeural", "female_voice": "vi-VN-HoaiMyNeural", "khmer_only": False},
+}
 TRANSLATION_STYLE_OPTIONS = (
     "👤 បកប្រែធម្មតា (Standard)",
     "⚡ ស៊ីចង្វាក់មាត់ (Lipsync)",
@@ -696,6 +711,52 @@ def normalize_voice_tag(tag):
 def contains_non_khmer_script(text):
     """Reject Chinese, Korean, Thai, Vietnamese/English Latin text in Khmer output."""
     return bool(NON_KHMER_SCRIPT_RE.search(str(text or "")))
+
+
+def normalized_target_language(target_language):
+    """Return a supported target language, safely migrating old saved settings."""
+    value = str(target_language or "")
+    return value if value in TARGET_LANGUAGE_SETTINGS else "Khmer (ខ្មែរ)"
+
+
+def target_language_settings(target_language):
+    return TARGET_LANGUAGE_SETTINGS[normalized_target_language(target_language)]
+
+
+def is_valid_target_dialogue(text, target_language):
+    """Keep strict Khmer-script protection while accepting valid multilingual output."""
+    dialogue = str(text or "").strip()
+    if not dialogue:
+        return False
+    settings = target_language_settings(target_language)
+    return not settings["khmer_only"] or not contains_non_khmer_script(dialogue)
+
+
+def voice_profile_for_target_language(tag, target_language):
+    """Use the selected language's matching male/female voice with the role's gentle tuning."""
+    canonical_tag = normalize_voice_tag(tag)
+    profile = dict(VOICE_PROFILES.get(canonical_tag, VOICE_PROFILES["M"]))
+    settings = target_language_settings(target_language)
+    profile["voice"] = settings["female_voice"] if canonical_tag.startswith("F") else settings["male_voice"]
+    return profile
+
+
+def target_language_prompt_rules(target_language):
+    """Return Khmer-specific rules by default and concise equivalent rules for other targets."""
+    selected = normalized_target_language(target_language)
+    if selected == "Khmer (ខ្មែរ)":
+        return KHMER_DUBBING_RULES
+    language_name = target_language_settings(selected)["name"]
+    return f"""
+ROLE: You are an Expert Subtitler & Dubbing Translator. Translate the dialogue into natural spoken {language_name} only, never word-for-word or bookishly.
+
+RULE 1 — NATURAL SPOKEN LANGUAGE: Use authentic everyday {language_name} dialogue and natural emotional delivery appropriate to the scene.
+RULE 2 — MATCH THE ACTOR: Keep pronouns, forms of address, age, rank, relationship, and speaker identity consistent.
+RULE 3 — EMOTIONAL DEPTH: Preserve anger, humour, grief, romance, sarcasm, fear, idioms, and implied meaning naturally.
+RULE 4 — SUBTITLE TIMING: Preserve every ID and timestamp. Keep each cue short, clear, natural to speak, and within its available timing without deleting meaning.
+RULE 5 — AUDIO TAGS: Output exactly one tag for every cue: [M], [F], [M_THINK], or [F_THINK]. Use THINK only for an unheard internal thought; it must be intimate, never hollow, reverberant, or echoing.
+RULE 6 — {language_name.upper()}-ONLY AND SAFE OUTPUT: The dialogue text must use {language_name} only, without source-language leftovers, notes, or brackets. Keep it suitable for a general audience while preserving the scene's emotion and meaning. Return one JSON object for every supplied ID in the same order.
+""".strip()
 
 
 KHMER_DUBBING_RULES = """
@@ -740,29 +801,35 @@ in the same order.
 """.strip()
 
 
-def translation_style_guidance(translation_style):
-    """Return a safe prompt instruction for a mobile Settings style selection."""
-    return TRANSLATION_STYLE_GUIDANCE.get(
+def translation_style_guidance(translation_style, target_language="Khmer (ខ្មែរ)"):
+    """Return a safe style instruction that matches the selected output language."""
+    guidance = TRANSLATION_STYLE_GUIDANCE.get(
         str(translation_style or ""),
         TRANSLATION_STYLE_GUIDANCE["👤 បកប្រែធម្មតា (Standard)"],
     )
+    if normalized_target_language(target_language) == "Khmer (ខ្មែរ)":
+        return guidance
+    return guidance.replace("Cambodian movie dialogue", "target-language movie dialogue").replace("Khmer phrasing", "target-language phrasing").replace("Khmer comedy", "target-language comedy")
 
 
-def build_multilingual_translation_prompt(cue_lines, source_language="Auto-detect", previous_context="", translation_style="👤 បកប្រែធម្មតា (Standard)"):
+def build_multilingual_translation_prompt(cue_lines, source_language="Auto-detect", previous_context="", translation_style="👤 បកប្រែធម្មតា (Standard)", target_language="Khmer (ខ្មែរ)"):
+    selected_target = normalized_target_language(target_language)
+    settings = target_language_settings(selected_target)
     return f"""
-{KHMER_DUBBING_RULES}
+{target_language_prompt_rules(selected_target)}
 
 SOURCE LANGUAGE: {source_language}. If Auto-detect is selected, identify the source
 language from each SOURCE line before translating.
 
+TARGET LANGUAGE: {settings['name']} ({selected_target})
 SELECTED TRANSLATION STYLE: {translation_style}
-STYLE INSTRUCTION: {translation_style_guidance(translation_style)}
+STYLE INSTRUCTION: {translation_style_guidance(translation_style, selected_target)}
 
 RECENT CONTINUITY CONTEXT:
 {previous_context or '(none)'}
 
 Return JSON only, with this exact schema:
-[{{"id": 1, "tag": "M", "text": "ខ្មែរ"}}]
+[{{"id": 1, "tag": "M", "text": "{settings['sample']}"}}]
 
 CUES:
 {cue_lines}
@@ -1908,15 +1975,15 @@ def _normalized_api_key_list(api_keys):
     return [key for key in _clean_api_keys("\n".join(map(str, api_keys or []))).splitlines() if key]
 
 
-def _translate_batch_text_only(client, model_name, batch, previous_context="", source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)"):
-    """Translate source cues to Khmer without uploading video to the AI service."""
+def _translate_batch_text_only(client, model_name, batch, previous_context="", source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)", target_language="Khmer (ខ្មែរ)"):
+    """Translate source cues to the selected language without uploading video to the AI service."""
     cue_lines = "\n".join(
         f'ID={cue["id"]} | TIME={seconds_to_srt(cue["start"])} --> '
         f'{seconds_to_srt(cue["end"])} | MAX_WORDS={cue_word_limit(cue["start"], cue["end"])} '
         f'| SOURCE={cue["source"]}'
         for cue in batch
     )
-    prompt = build_multilingual_translation_prompt(cue_lines, source_language, previous_context, translation_style)
+    prompt = build_multilingual_translation_prompt(cue_lines, source_language, previous_context, translation_style, target_language)
     response = gemini_generate_with_retry(client, model_name, [prompt], attempts=3)
     rows = parse_json_array(response.text or "")
     allowed_ids = {cue["id"] for cue in batch}
@@ -1930,13 +1997,13 @@ def _translate_batch_text_only(client, model_name, batch, previous_context="", s
             continue
         tag = normalize_voice_tag(row.get("tag", "M"))
         dialogue = normalize_dialogue(row.get("text", ""))
-        if dialogue and not contains_non_khmer_script(dialogue):
+        if is_valid_target_dialogue(dialogue, target_language):
             parsed[cue_id] = {"tag": tag, "text": dialogue}
     return parsed
 
 
-def translate_cues_text_only(client, model_name, cues, source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)"):
-    """Fast multilingual-to-Khmer path with small continuity context and targeted repair."""
+def translate_cues_text_only(client, model_name, cues, source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)", target_language="Khmer (ខ្មែរ)"):
+    """Fast multilingual translation path with small continuity context and targeted repair."""
     translated = {}
     # Larger batches reduce API calls while preserving cue order and continuity.
     batch_size = 50
@@ -1947,17 +2014,18 @@ def translate_cues_text_only(client, model_name, cues, source_language="Auto-det
             item = translated.get(cue["id"])
             if item:
                 context_rows.append(
-                    f'ID={cue["id"]} TAG={item["tag"]} SOURCE={cue["source"]} KHMER={item["text"]}'
+                    f'ID={cue["id"]} TAG={item["tag"]} SOURCE={cue["source"]} TARGET={item["text"]}'
                 )
         parsed = _translate_batch_text_only(
-            client, model_name, batch, "\n".join(context_rows), source_language, translation_style
+            client, model_name, batch, "\n".join(context_rows), source_language, translation_style, target_language
         )
         translated.update(parsed)
 
         missing = [cue for cue in batch if cue["id"] not in translated]
         if missing:
             repaired = _translate_batch_text_only(
-                client, model_name, missing, source_language=source_language, translation_style=translation_style
+                client, model_name, missing, source_language=source_language,
+                translation_style=translation_style, target_language=target_language
             )
             translated.update(repaired)
 
@@ -1970,10 +2038,10 @@ def translate_cues_text_only(client, model_name, cues, source_language="Auto-det
     return translated
 
 
-def video_to_srt(video_path, api_keys, model, prepared_cues=None, source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)"):
+def video_to_srt(video_path, api_keys, model, prepared_cues=None, source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)", target_language="Khmer (ខ្មែរ)"):
     """
-    Reliable v5.5 path:
-    FFmpeg -> Whisper timestamps -> text-only Gemini translation -> Khmer SRT.
+    Reliable v6.6.5 path:
+    FFmpeg -> Whisper timestamps -> text-only Gemini translation -> selected-language SRT.
     When prepared_cues are supplied, Whisper is not run a second time.
     """
     api_keys = _normalized_api_key_list(api_keys)
@@ -1999,10 +2067,10 @@ def video_to_srt(video_path, api_keys, model, prepared_cues=None, source_languag
             continue
         for model_name in _candidate_gemini_models(model):
             try:
-                translated = translate_cues_text_only(client, model_name, cues, source_language, translation_style)
+                translated = translate_cues_text_only(client, model_name, cues, source_language, translation_style, target_language)
                 result = build_srt(cues, translated)
                 if not result.strip() or "-->" not in result:
-                    raise RuntimeError("មិនអាចបង្កើត Khmer SRT បានទេ។")
+                    raise RuntimeError("មិនអាចបង្កើត SRT តាមភាសាដែលបានជ្រើសបានទេ។")
                 return result
             except Exception as exc:
                 last_error = exc
@@ -2016,8 +2084,8 @@ def video_to_srt(video_path, api_keys, model, prepared_cues=None, source_languag
     raise RuntimeError(friendly_ai_error(last_error, len(api_keys)))
 
 
-def translate_srt_to_khmer(srt_text, api_keys, model, source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)"):
-    """Translate imported Chinese, Korean, Vietnamese, or English SRT into Khmer SRT."""
+def translate_srt_to_khmer(srt_text, api_keys, model, source_language="Auto-detect", translation_style="👤 បកប្រែធម្មតា (Standard)", target_language="Khmer (ខ្មែរ)"):
+    """Translate an imported SRT into the selected target language."""
     api_keys = _normalized_api_key_list(api_keys)
     if not api_keys:
         raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
@@ -2042,7 +2110,7 @@ def translate_srt_to_khmer(srt_text, api_keys, model, source_language="Auto-dete
             continue
         for model_name in _candidate_gemini_models(model):
             try:
-                translated = translate_cues_text_only(client, model_name, cues, source_language, translation_style)
+                translated = translate_cues_text_only(client, model_name, cues, source_language, translation_style, target_language)
                 return build_srt(cues, translated)
             except Exception as exc:
                 last_error = exc
@@ -2252,12 +2320,14 @@ def character_voice_filters(tag):
         'M_OLD': ['equalizer=f=140:t=q:w=1.0:g=2.2', 'equalizer=f=2600:t=q:w=1.0:g=-1.0', 'lowpass=f=7200:p=2'],
         'F_OLD': ['equalizer=f=180:t=q:w=1.0:g=1.7', 'equalizer=f=2800:t=q:w=1.0:g=-0.8', 'lowpass=f=7400:p=2'],
         'M_THINK': [
-            'equalizer=f=180:t=q:w=1.0:g=0.6', 'equalizer=f=3200:t=q:w=1.0:g=-0.8',
-            'lowpass=f=7000:p=2', 'volume=0.92'
+            # Keep the inner voice warm and intimate, not muffled.  The output
+            # stays only slightly below normal dialogue for a smooth level match.
+            'equalizer=f=190:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-0.35',
+            'lowpass=f=7400:p=2', 'volume=0.97'
         ],
         'F_THINK': [
-            'equalizer=f=220:t=q:w=1.0:g=0.4', 'equalizer=f=3400:t=q:w=1.0:g=-0.8',
-            'lowpass=f=7000:p=2', 'volume=0.92'
+            'equalizer=f=230:t=q:w=1.0:g=0.3', 'equalizer=f=3200:t=q:w=1.0:g=-0.35',
+            'lowpass=f=7400:p=2', 'volume=0.97'
         ],
         'NARRATOR_M': ['equalizer=f=150:t=q:w=1.0:g=2.0', 'equalizer=f=2200:t=q:w=1.0:g=0.8'],
         'NARRATOR_F': ['equalizer=f=200:t=q:w=1.0:g=1.3', 'equalizer=f=2300:t=q:w=1.0:g=0.7'],
@@ -2351,9 +2421,9 @@ def atempo_chain(speed):
     return ",".join(f"atempo={value:.5f}" for value in factors)
 
 
-def create_mp3(srt_text, progress_callback=None, background_music_path=None, ducking_config=None):
+def create_mp3(srt_text, progress_callback=None, background_music_path=None, ducking_config=None, target_language="Khmer (ខ្មែរ)"):
     """
-    Create one synchronized Khmer MP3.
+    Create one synchronized MP3 in the selected target language.
 
     v3.0 rules:
     - Every voice starts at the original SRT start timestamp.
@@ -2366,11 +2436,15 @@ def create_mp3(srt_text, progress_callback=None, background_music_path=None, duc
     if not cues:
         raise ValueError('រកមិនឃើញ SRT និង timestamp ត្រឹមត្រូវទេ។')
 
-    foreign_rows = [i + 1 for i, cue in enumerate(cues) if contains_non_khmer_script(cue['text'])]
-    if foreign_rows:
+    selected_target = normalized_target_language(target_language)
+    invalid_rows = [
+        i + 1 for i, cue in enumerate(cues)
+        if not is_valid_target_dialogue(cue['text'], selected_target)
+    ]
+    if invalid_rows:
         raise ValueError(
-            f'SRT នៅមានអក្សរបរទេសនៅបន្ទាត់៖ {foreign_rows[:20]}។ '
-            'សូមបកប្រែជា Khmer SRT ឡើងវិញ មុនបង្កើត MP3។'
+            f'SRT មិនត្រូវនឹងភាសាគោលដៅនៅបន្ទាត់៖ {invalid_rows[:20]}។ '
+            'សូមបកប្រែ SRT ម្តងទៀត មុនបង្កើត MP3។'
         )
     for cue in cues:
         cue['tag'] = normalize_voice_tag(cue.get('tag', 'M'))
@@ -2387,7 +2461,7 @@ def create_mp3(srt_text, progress_callback=None, background_music_path=None, duc
 
         def create_voice_clip(index, cue):
             clip = root / f'clip_{index:04d}.mp3'
-            profile = VOICE_PROFILES.get(cue['tag'], VOICE_PROFILES['M'])
+            profile = voice_profile_for_target_language(cue['tag'], selected_target)
             run_async(synthesize(cue['text'], profile, clip))
             return index, clip, probe_audio_duration(clip)
 
@@ -2505,14 +2579,17 @@ def create_mp3(srt_text, progress_callback=None, background_music_path=None, duc
         return output.read_bytes()
 
 
-def create_single_voice_mp3(text, tag, background_music_path=None, ducking_config=None):
-    """Create a polished standalone MP3 with optional private music ducking."""
+def create_single_voice_mp3(text, tag, background_music_path=None, ducking_config=None, target_language="Khmer (ខ្មែរ)"):
+    """Create a polished standalone MP3 in the selected language with optional private music ducking."""
     canonical_tag = normalize_voice_tag(tag)
+    selected_target = normalized_target_language(target_language)
+    if not is_valid_target_dialogue(text, selected_target):
+        raise ValueError("អត្ថបទមិនត្រូវនឹងភាសាគោលដៅដែលបានជ្រើសទេ។")
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         raw = root / 'raw_edge_tts.mp3'
         output = root / 'khmer_voice.mp3'
-        run_async(synthesize(text, VOICE_PROFILES[canonical_tag], raw))
+        run_async(synthesize(text, voice_profile_for_target_language(canonical_tag, selected_target), raw))
         total = probe_audio_duration(raw)
         config = normalized_ducking_config(ducking_config)
         music_path = Path(background_music_path) if background_music_path else None
@@ -3490,7 +3567,10 @@ with st.container(key="api_menu_container"):
             format_func=lambda item: GEMINI_MODEL_LABELS.get(item, item),
             help="ជ្រើស model សម្រាប់បកប្រែ។ App នឹងសាក model បម្រុងដោយស្វ័យប្រវត្តិ បើ model ដែលជ្រើសមិនអាចប្រើបាន។",
         )
-        st.selectbox("🎯 ភាសាគោលដៅ (Target Language)", TARGET_LANGUAGE_OPTIONS, key="target_language")
+        st.selectbox(
+            "🎯 ភាសាគោលដៅ (Target Language)", TARGET_LANGUAGE_OPTIONS, key="target_language",
+            help="ជ្រើសភាសាសម្រាប់ SRT និង MP3។ ជម្រើសនេះរក្សាទុកជាឯកជនតាម Access Code របស់អ្នក។",
+        )
         st.selectbox(
             "🎭 រចនាប័ទ្មបកប្រែ (Translation Style)",
             TRANSLATION_STYLE_OPTIONS,
@@ -3590,6 +3670,8 @@ secret_api_keys = [line.strip() for line in load_secret_gemini_api_keys().splitl
 valid_api_keys = list(dict.fromkeys(account_api_keys + secret_api_keys))
 api_key = valid_api_keys[0] if valid_api_keys else ""
 translation_style = st.session_state.translation_style
+target_language = normalized_target_language(st.session_state.target_language)
+target_language_name = target_language_settings(target_language)["name"]
 model = st.session_state.model_selector
 lite_mode = st.session_state.lite_mode
 source_language = st.session_state.source_language
@@ -3598,7 +3680,7 @@ fast_mode = st.session_state.processing_mode.startswith("⚡")
 max_mb = 60 if lite_mode else 150
 
 if not valid_api_keys:
-    st.warning("🔐 មិនទាន់មាន Gemini API Key — សូមបញ្ចូលក្នុង ☰ Settings ដើម្បីបកប្រែអក្សរទៅជាភាសាខ្មែរ។")
+    st.warning(f"🔐 មិនទាន់មាន Gemini API Key — សូមបញ្ចូលក្នុង ☰ Settings ដើម្បីបកប្រែអក្សរទៅជា {target_language_name}។")
 
 st.markdown(
     '<div class="hero"><h1>AI KHEMRA BRO</h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
@@ -3610,7 +3692,7 @@ tab_video, tab_translate, tab_srt_speech, tab_text_speech = st.tabs(
 )
 
 with tab_video:
-    st.markdown('<div class="section-title">1️⃣ Generate Subtitles (Khmer ខ្មែរ)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">1️⃣ Generate Subtitles ({target_language})</div>', unsafe_allow_html=True)
     # Keep the customer workflow simple: ordinary dubbing uses the natural
     # voice pipeline directly, with no extra music or Ducking controls.
     video_music_path, video_ducking_config = None, None
@@ -3679,20 +3761,20 @@ with tab_video:
                         notice = "✅ បានបង្កើត Source SRT រួចរាល់។"
                     elif valid_api_keys:
                         progress_bar.progress(62)
-                        show_waiting("កំពុងបកប្រែជាភាសាខ្មែរ", "កំពុងរក្សាអារម្មណ៍ និងរបៀបនិយាយរបស់តួអង្គ…")
+                        show_waiting(f"កំពុងបកប្រែជា {target_language_name}", "កំពុងរក្សាអារម្មណ៍ និងរបៀបនិយាយរបស់តួអង្គ…")
                         try:
                             with ThreadPoolExecutor(max_workers=1) as executor:
                                 future = executor.submit(
-                                    video_to_srt, video_path, valid_api_keys, model, cues, source_language, translation_style
+                                    video_to_srt, video_path, valid_api_keys, model, cues, source_language, translation_style, target_language
                                 )
                                 while not future.done():
                                     elapsed = time.time() - started_at
                                     percent = min(96, 62 + int((elapsed / max(32.0, 22.0 + size_mb * 1.6)) * 34))
                                     progress_bar.progress(percent)
-                                    show_waiting("កំពុងបកប្រែជាភាសាខ្មែរ", "កំពុងធ្វើឱ្យអត្ថបទធម្មជាតិ សមនឹងសំឡេងតួអង្គ…")
+                                    show_waiting(f"កំពុងបកប្រែជា {target_language_name}", "កំពុងធ្វើឱ្យអត្ថបទធម្មជាតិ សមនឹងសំឡេងតួអង្គ…")
                                     time.sleep(0.4)
                                 generated_srt = future.result()
-                            notice = "✅ Khmer SRT បានបង្កើតរួចរាល់។"
+                            notice = f"✅ {target_language_name} SRT បានបង្កើតរួចរាល់។"
                         except Exception as translation_exc:
                             # Never discard Whisper output when the translation service is unavailable.
                             generated_srt = source_srt
@@ -3702,19 +3784,20 @@ with tab_video:
                             )
                     else:
                         generated_srt = source_srt
-                        notice = "⚠️ បានបង្កើត Source SRT រួច។ ដាក់ Gemini API Key ក្នុង Settings ដើម្បីបកប្រែទៅខ្មែរ។"
+                        notice = f"⚠️ បានបង្កើត Source SRT រួច។ ដាក់ Gemini API Key ក្នុង Settings ដើម្បីបកប្រែទៅ {target_language_name}។"
 
                     if workflow_mode == "🎙️ Khmer SRT + MP3 តែម្តង" and generated_srt != source_srt:
                         def auto_audio_progress(percent, message):
                             progress_bar.progress(min(100, 96 + int(max(0, percent) * 0.04)))
-                            show_waiting("កំពុងបង្កើតសំឡេងខ្មែរ", "កំពុងសម្រួលសំឡេងឱ្យទន់ និងស្តាប់ធម្មជាតិ…")
+                            show_waiting(f"កំពុងបង្កើតសំឡេង {target_language_name}", "កំពុងសម្រួលសំឡេងឱ្យទន់ និងស្តាប់ធម្មជាតិ…")
                         try:
                             generated_audio = create_mp3(
                                 generated_srt, progress_callback=auto_audio_progress,
                                 background_music_path=video_music_path,
                                 ducking_config=video_ducking_config,
+                                target_language=target_language,
                             )
-                            notice = "✅ Khmer SRT និង MP3 បានបង្កើតរួចរាល់។"
+                            notice = f"✅ {target_language_name} SRT និង MP3 បានបង្កើតរួចរាល់។"
                         except Exception as audio_exc:
                             notice += f" ⚠️ SRT បានរួច ប៉ុន្តែ MP3 មិនទាន់បាន៖ {audio_exc}"
 
@@ -3824,7 +3907,7 @@ with tab_video:
                 )
 
     st.markdown('<div class="section-title">2️⃣ AI Dubbing (Edge TTS Studio)</div>', unsafe_allow_html=True)
-    st.markdown('''<div class="voice-orchestra" aria-label="Four Khmer voice roles">
+    st.markdown('''<div class="voice-orchestra" aria-label="Four voice roles">
       <div class="voice-mic"><span>🎙️</span><small>[M] ប្រុស</small></div>
       <div class="voice-mic"><span>🎙️</span><small>[F] ស្រី</small></div>
       <div class="voice-mic"><span>🎙️</span><small>[M_THINK] គិត</small></div>
@@ -3851,7 +3934,7 @@ with tab_video:
                     progress_bar.progress(max(0, min(100, int(percent))))
                     progress_text.markdown(
                         '<div class="khemra-wait-card"><span class="khemra-wait-orb"></span>'
-                        '<div><div class="khemra-wait-title">កំពុងបង្កើតសំឡេងខ្មែរ</div>'
+                        f'<div><div class="khemra-wait-title">កំពុងបង្កើតសំឡេង {target_language_name}</div>'
                         '<div class="khemra-wait-copy">កំពុងសម្រួលសម្លេងឱ្យទន់ និងមិនដណ្ដើមគ្នា…</div>'
                         '</div></div>',
                         unsafe_allow_html=True,
@@ -3864,6 +3947,7 @@ with tab_video:
                         progress_callback=update_audio_progress,
                         background_music_path=video_music_path,
                         ducking_config=video_ducking_config,
+                        target_language=target_language,
                     )
                     # Clear the processing display immediately after completion.
                     progress_bar.empty()
@@ -3935,11 +4019,11 @@ with tab_video:
     st.markdown("</div>", unsafe_allow_html=True)
 
 with tab_translate:
-    st.header("AI Subtitle Translator → Khmer")
-    st.info("បិទភ្ជាប់ SRT ភាសាចិន កូរ៉េ វៀតណាម ឬអង់គ្លេស។ កម្មវិធីរក្សា timestamp ដើម បកប្រែជាខ្មែរនិយាយធម្មជាតិ និងប្រើតែ [M], [F], [M_THINK], [F_THINK]។")
+    st.header(f"AI Subtitle Translator → {target_language}")
+    st.info(f"បិទភ្ជាប់ SRT ភាសាចិន កូរ៉េ វៀតណាម ឬអង់គ្លេស។ កម្មវិធីរក្សា timestamp ដើម បកប្រែទៅ {target_language_name} តាមបែបភាសានិយាយធម្មជាតិ និងប្រើតែ [M], [F], [M_THINK], [F_THINK]។")
     st.caption(f"ភាសាប្រភពដែលបានជ្រើសក្នុង Settings៖ {source_language}")
     source_srt = st.text_area("Source SRT (Chinese / Korean / Vietnamese / English)", height=300, key="translator_source")
-    if st.button("បកប្រែ SRT → ខ្មែរ", key="translate_btn"):
+    if st.button(f"បកប្រែ SRT → {target_language}", key="translate_btn"):
         if not source_srt.strip():
             st.warning("សូមបញ្ចូល Source SRT ជាមុន។")
         elif not valid_api_keys:
@@ -3949,25 +4033,25 @@ with tab_translate:
             try:
                 waiting.markdown(
                     '<div class="khemra-wait-card"><span class="khemra-wait-orb"></span>'
-                    '<div><div class="khemra-wait-title">កំពុងបកប្រែជាភាសាខ្មែរ</div>'
+                    f'<div><div class="khemra-wait-title">កំពុងបកប្រែជា {target_language_name}</div>'
                     '<div class="khemra-wait-copy">កំពុងរក្សាអារម្មណ៍ សព្វនាម និងចង្វាក់និយាយរបស់តួអង្គ…</div>'
                     '</div></div>', unsafe_allow_html=True,
                 )
-                translated_srt = translate_srt_to_khmer(source_srt, valid_api_keys, model, source_language, translation_style)
+                translated_srt = translate_srt_to_khmer(source_srt, valid_api_keys, model, source_language, translation_style, target_language)
                 waiting.empty()
                 st.session_state.srt_text = translated_srt
                 st.session_state.translated_srt_preview = translated_srt
                 st.session_state.pending_editor_update = translated_srt
-                st.success("✅ បកប្រែជា Khmer SRT រួចរាល់ និងរក្សា timestamp ដើម។")
+                st.success(f"✅ បកប្រែជា {target_language_name} SRT រួចរាល់ និងរក្សា timestamp ដើម។")
             except Exception as exc:
                 waiting.empty()
                 st.error(f"❌ {exc}")
     if st.session_state.get("translated_srt_preview"):
         st.code(st.session_state.translated_srt_preview, language="srt")
         st.download_button(
-            "⬇️ ទាញយក Khmer SRT",
+            f"⬇️ ទាញយក {target_language_name} SRT",
             ("\ufeff" + st.session_state.translated_srt_preview).encode("utf-8"),
-            "khmer_subtitle.srt",
+            "translated_subtitle.srt",
             "application/x-subrip",
             key="download_translated_srt",
             use_container_width=True,
@@ -3975,7 +4059,7 @@ with tab_translate:
 
 with tab_srt_speech:
     st.header("SRT → Speech")
-    st.markdown('''<div class="voice-orchestra" aria-label="Four Khmer voice roles">
+    st.markdown('''<div class="voice-orchestra" aria-label="Four voice roles">
       <div class="voice-mic"><span>🎙️</span><small>[M] ប្រុស</small></div>
       <div class="voice-mic"><span>🎙️</span><small>[F] ស្រី</small></div>
       <div class="voice-mic"><span>🎙️</span><small>[M_THINK] គិត</small></div>
@@ -3984,27 +4068,28 @@ with tab_srt_speech:
     render_thought_voice_guide()
     srt_music_path, srt_ducking_config = None, None
     speech_srt = st.text_area(
-        "Khmer SRT with [M] [F] [M_THINK] [F_THINK]",
+        f"{target_language} SRT with [M] [F] [M_THINK] [F_THINK]",
         height=360,
         key="speech_srt_input",
     )
     if st.button("🎧 Create MP3", key="srt_to_speech_btn"):
         if not speech_srt.strip():
-            st.warning("សូមបញ្ចូល Khmer SRT។")
+            st.warning(f"សូមបញ្ចូល {target_language_name} SRT។")
         else:
             waiting = st.empty()
             try:
                 waiting.markdown(
                     '<div class="khemra-wait-card"><span class="khemra-wait-orb"></span>'
-                    '<div><div class="khemra-wait-title">កំពុងបង្កើតសំឡេងខ្មែរ</div>'
+                    f'<div><div class="khemra-wait-title">កំពុងបង្កើតសំឡេង {target_language_name}</div>'
                     '<div class="khemra-wait-copy">សូមរង់ចាំបន្តិច ដើម្បីរក្សាចង្វាក់សំឡេងឱ្យធម្មជាតិ…</div>'
                     '</div></div>', unsafe_allow_html=True,
                 )
                 st.session_state.speech_tab_audio_bytes = create_mp3(
                     speech_srt,
                     background_music_path=srt_music_path,
-                    ducking_config=srt_ducking_config,
-                )
+ducking_config=srt_ducking_config,
+                        target_language=target_language,
+                    )
                 waiting.empty()
                 st.success("✅ បង្កើត MP3 រួចរាល់។")
             except Exception as exc:
@@ -4015,7 +4100,7 @@ with tab_srt_speech:
         st.download_button(
             "⬇️ ទាញយក MP3",
             st.session_state.speech_tab_audio_bytes,
-            "khmer_srt_speech.mp3",
+            "srt_speech.mp3",
             "audio/mpeg",
             key="download_srt_speech_mp3",
             use_container_width=True,
@@ -4023,7 +4108,7 @@ with tab_srt_speech:
 
 with tab_text_speech:
     st.header("Text → Speech")
-    st.markdown('''<div class="voice-orchestra" aria-label="Four Khmer voice roles">
+    st.markdown('''<div class="voice-orchestra" aria-label="Four voice roles">
       <div class="voice-mic"><span>🎙️</span><small>[M] ប្រុស</small></div>
       <div class="voice-mic"><span>🎙️</span><small>[F] ស្រី</small></div>
       <div class="voice-mic"><span>🎙️</span><small>[M_THINK] គិត</small></div>
@@ -4031,7 +4116,7 @@ with tab_text_speech:
     </div>''', unsafe_allow_html=True)
     render_thought_voice_guide()
     text_music_path, text_ducking_config = None, None
-    plain_text = st.text_area("Khmer Text", height=260, key="plain_text_input")
+    plain_text = st.text_area(f"{target_language} Text", height=260, key="plain_text_input")
     voice_choice = st.selectbox(
         "Voice",
         ["M", "F", "M_THINK", "F_THINK"],
@@ -4039,7 +4124,7 @@ with tab_text_speech:
     )
     if st.button("🔊 Generate Voice", key="plain_voice_btn"):
         if not plain_text.strip():
-            st.warning("សូមបញ្ចូលអត្ថបទខ្មែរ។")
+            st.warning(f"សូមបញ្ចូលអត្ថបទ {target_language_name}។")
         else:
             waiting = st.empty()
             try:
@@ -4055,6 +4140,7 @@ with tab_text_speech:
                         plain_text.strip(), voice_choice,
                         background_music_path=text_music_path,
                         ducking_config=text_ducking_config,
+                        target_language=target_language,
                     )
                 waiting.empty()
                 st.success("✅ បង្កើតសំឡេងរួចរាល់។")
@@ -4066,10 +4152,10 @@ with tab_text_speech:
         st.download_button(
             "⬇️ ទាញយក MP3",
             st.session_state.text_tab_audio_bytes,
-            "khmer_text_speech.mp3",
+            "text_speech.mp3",
             "audio/mpeg",
             key="download_text_speech_mp3",
             use_container_width=True,
         )
 
-st.caption("AI-KHEMRA-BRO v6.6.3 • Gemini Model & Style Settings • Continuous Khmer Voice • Mobile-first")
+st.caption("AI-KHEMRA-BRO v6.6.5 • Private Multilingual Target • Gentle Balanced Voice • Mobile-first")
