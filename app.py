@@ -17,7 +17,7 @@ from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import edge_tts
 import extra_streamlit_components as stx
@@ -1462,8 +1462,8 @@ def transcribe_with_whisper(wav_path, source_language_code=None):
     segments, _ = model.transcribe(
         str(wav_path),
         language=source_language_code,
-        beam_size=5,
-        best_of=3,
+        beam_size=3,
+        best_of=2,
         vad_filter=True,
         vad_parameters={
             "min_silence_duration_ms": 220,
@@ -1550,24 +1550,33 @@ def gemini_generate_with_retry(client, model_name, contents, attempts=4):
     raise last_error
 
 
-def translation_needs_repair(cue, item):
-    """Reject missing, Chinese, or clearly overlong dubbing lines."""
+def translation_needs_repair(cue, item, target_language=DEFAULT_TARGET_LANGUAGE):
+    """Reject missing or clearly unusable lines for the selected target."""
     if not item:
         return True
     dialogue = normalize_dialogue(item.get("text"))
-    if not dialogue or contains_cjk(dialogue):
+    if not dialogue:
         return True
-    # A tiny tolerance avoids needless API calls for Khmer tokenization quirks.
-    return khmer_word_count(dialogue) > cue_word_limit(cue["start"], cue["end"]) + 2
+    target_is_khmer = target_language_details(target_language)["code"] == "km"
+    if target_is_khmer and contains_cjk(dialogue):
+        return True
+    # Khmer tokenization needs a spoken-length guard; other targets rely on the
+    # model's target-language instruction without applying a Khmer word count.
+    if target_is_khmer:
+        return khmer_word_count(dialogue) > cue_word_limit(cue["start"], cue["end"]) + 2
+    return False
 
 
-def repair_translation_items(client, model_name, uploaded_video, cues, items):
+def repair_translation_items(
+    client, model_name, uploaded_video, cues, items,
+    target_language=DEFAULT_TARGET_LANGUAGE,
+):
     """Retry only missing or still-Chinese cues until every cue is usable Khmer."""
     by_id = {cue["id"]: cue for cue in cues}
     for _attempt in range(3):
         bad_ids = [
             cue["id"] for cue in cues
-            if translation_needs_repair(cue, items.get(cue["id"]))
+            if translation_needs_repair(cue, items.get(cue["id"]), target_language)
         ]
         if not bad_ids:
             return items
@@ -1591,11 +1600,12 @@ def repair_translation_items(client, model_name, uploaded_video, cues, items):
                 if tag not in VOICE_PROFILES:
                     tag = items.get(cue_id, {}).get("tag", "M")
                 dialogue = normalize_dialogue(row.get("text"))
-                if dialogue and not contains_cjk(dialogue):
+                target_is_khmer = target_language_details(target_language)["code"] == "km"
+                if dialogue and (not target_is_khmer or not contains_cjk(dialogue)):
                     items[cue_id] = {"tag": tag, "text": dialogue}
     bad_ids = [
         cue["id"] for cue in cues
-        if translation_needs_repair(cue, items.get(cue["id"]))
+        if translation_needs_repair(cue, items.get(cue["id"]), target_language)
     ]
     if bad_ids:
         raise RuntimeError(f"AI បកប្រែមិនទាន់អស់។ បន្ទាត់មានបញ្ហា៖ {bad_ids[:20]}")
@@ -1932,6 +1942,7 @@ CUES:
     rows = parse_json_array(response.text or "")
     allowed_ids = {cue["id"] for cue in batch}
     parsed = {}
+    target_is_khmer = target_language_details(target_language)["code"] == "km"
     for row in rows:
         try:
             cue_id = int(row.get("id"))
@@ -1941,7 +1952,7 @@ CUES:
             continue
         tag = compact_voice_tag(row.get("tag", "M"))
         dialogue = normalize_dialogue(row.get("text", ""))
-        if dialogue and not contains_cjk(dialogue):
+        if dialogue and (not target_is_khmer or not contains_cjk(dialogue)):
             parsed[cue_id] = {"tag": tag, "text": dialogue}
     return parsed
 
@@ -2032,7 +2043,9 @@ def google_translate_texts(texts, google_api_key):
     return [html.unescape(str(row.get("translatedText", "")).strip()) for row in rows]
 
 
-def translate_cues_with_google(cues, google_api_key):
+def translate_cues_with_google(
+    cues, google_api_key, target_language=DEFAULT_TARGET_LANGUAGE
+):
     """Preserve SRT timing and tags while using Google Cloud Translation for text."""
     translated = {}
     for offset in range(0, len(cues), 40):
@@ -2079,7 +2092,7 @@ def video_to_srt(
         raise RuntimeError("Whisper មិនរកឃើញសំឡេងនិយាយក្នុងវីដេអូនេះទេ។")
 
     if translation_provider == "Google Cloud Translation":
-        translated = translate_cues_with_google(cues, google_api_key)
+        translated = translate_cues_with_google(cues, google_api_key, target_language)
         result = build_srt(cues, translated)
         if not result.strip() or "-->" not in result:
             raise RuntimeError("Google មិនអាចបង្កើត Khmer SRT បានទេ។")
@@ -2296,7 +2309,8 @@ def effective_voice_tag(tag, voice_mode):
 
 
 def create_mp3(
-    srt_text, progress_callback=None, audio_sync_mode="Speed Up Only", voice_mode="Auto"
+    srt_text, progress_callback=None, audio_sync_mode="Speed Up Only", voice_mode="Auto",
+    target_language=DEFAULT_TARGET_LANGUAGE,
 ):
     """
     Create one synchronized Khmer MP3.
@@ -2312,7 +2326,8 @@ def create_mp3(
     if not cues:
         raise ValueError('រកមិនឃើញ SRT និង timestamp ត្រឹមត្រូវទេ។')
 
-    chinese_rows = [i + 1 for i, cue in enumerate(cues) if contains_cjk(cue['text'])]
+    target_is_khmer = target_language_details(target_language)["code"] == "km"
+    chinese_rows = [i + 1 for i, cue in enumerate(cues) if contains_cjk(cue['text'])] if target_is_khmer else []
     if chinese_rows:
         raise ValueError(
             f'SRT នៅមានអក្សរចិននៅបន្ទាត់៖ {chinese_rows[:20]}។ '
@@ -2328,20 +2343,32 @@ def create_mp3(
         if progress_callback:
             progress_callback(2, "កំពុងរៀបចំសំឡេងតួអង្គ…")
 
-        for index, cue in enumerate(cues):
-            clip = root / f'clip_{index:04d}.mp3'
+        clips = [root / f'clip_{index:04d}.mp3' for index in range(total_cues)]
+        clip_durations = [0.0] * total_cues
+
+        def render_clip(index):
+            cue = cues[index]
             cue['effective_tag'] = effective_voice_tag(cue.get('tag', 'M_ADULT'), voice_mode)
             profile = VOICE_PROFILES.get(cue['effective_tag'], VOICE_PROFILES['M_ADULT'])
-            run_async(synthesize(cue['text'], profile, clip))
-            clips.append(clip)
-            clip_durations.append(probe_audio_duration(clip))
+            run_async(synthesize(cue['text'], profile, clips[index]))
+            return index, probe_audio_duration(clips[index])
 
-            if progress_callback:
-                percent = 5 + int(((index + 1) / total_cues) * 82)
-                progress_callback(
-                    min(percent, 87),
-                    f"កំពុងបង្កើតសំឡេងខ្មែរ {index + 1}/{total_cues}…",
-                )
+        # TTS calls are independent; render a small bounded group concurrently,
+        # then assemble strictly by the original SRT order below.
+        worker_count = min(6, max(2, total_cues))
+        completed = 0
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [executor.submit(render_clip, index) for index in range(total_cues)]
+            for future in as_completed(futures):
+                index, duration = future.result()
+                clip_durations[index] = duration
+                completed += 1
+                if progress_callback:
+                    percent = 5 + int((completed / total_cues) * 82)
+                    progress_callback(
+                        min(percent, 87),
+                        f"កំពុងបង្កើតសំឡេងខ្មែរ {completed}/{total_cues}…",
+                    )
 
         command = ['ffmpeg', '-y']
         for clip in clips:
@@ -3712,6 +3739,7 @@ with tab_video:
                         progress_callback=update_audio_progress,
                         audio_sync_mode=audio_sync_mode,
                         voice_mode=voice_mode,
+                        target_language=target_language,
                     )
                     # Clear the processing display immediately after completion.
                     progress_bar.empty()
@@ -3840,6 +3868,7 @@ with tab_srt_speech:
                         speech_srt,
                         audio_sync_mode=audio_sync_mode,
                         voice_mode=voice_mode,
+                        target_language=target_language,
                     )
                 st.success("✅ បង្កើត MP3 រួចរាល់។")
             except Exception as exc:
