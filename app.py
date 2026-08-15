@@ -723,6 +723,13 @@ TRANSLATION_STYLE_INSTRUCTIONS = {
 }
 
 
+def source_language_details(value):
+    """Return the selected source language's Whisper code and prompt label."""
+    return SOURCE_LANGUAGE_OPTIONS.get(
+        value, SOURCE_LANGUAGE_OPTIONS[DEFAULT_SOURCE_LANGUAGE]
+    )
+
+
 def translation_style_instruction(style):
     return TRANSLATION_STYLE_INSTRUCTIONS.get(
         style, TRANSLATION_STYLE_INSTRUCTIONS[DEFAULT_TRANSLATION_STYLE]
@@ -740,6 +747,16 @@ def translation_prompt_for_style(style):
 TRANSLATION_PROVIDER_OPTIONS = ["Gemini", "Google Cloud Translation"]
 AUDIO_SYNC_OPTIONS = ["Speed Up Only", "Speed Up & Slow Down"]
 VOICE_MODE_OPTIONS = ["Auto", "All Male", "All Female"]
+SOURCE_LANGUAGE_OPTIONS = {
+    "🇰🇭 ភាសាខ្មែរ": {"code": "km", "name": "Khmer"},
+    "🇨🇳 ភាសាចិន": {"code": "zh", "name": "Chinese"},
+    "🇺🇸 English (US)": {"code": "en", "name": "English (US)"},
+    "🇬🇧 English (UK)": {"code": "en", "name": "English (UK)"},
+    "🇻🇳 ភាសាវៀតណាម": {"code": "vi", "name": "Vietnamese"},
+    "🇹🇭 ភាសាថៃ": {"code": "th", "name": "Thai"},
+    "🇯🇵 ភាសាជប៉ុន": {"code": "ja", "name": "Japanese"},
+}
+DEFAULT_SOURCE_LANGUAGE = "🇨🇳 ភាសាចិន"
 SRT_INPUT_HEIGHT = 300
 MAX_VIDEO_DURATION_SECONDS = 15 * 60
 
@@ -766,6 +783,7 @@ GEMINI_TRANSLATION_MODEL_LABELS = {
 }
 ACCOUNT_SETTINGS_DEFAULTS = {
     "target_language": "Khmer (ខ្មែរ)",
+    "source_language": DEFAULT_SOURCE_LANGUAGE,
     "translation_style": DEFAULT_TRANSLATION_STYLE,
     "translation_provider": "Gemini",
     "google_translate_api_key": "",
@@ -1422,11 +1440,11 @@ def _standardize_whisper_segments(segments):
     return cues
 
 
-def transcribe_with_whisper(wav_path):
+def transcribe_with_whisper(wav_path, source_language_code="zh"):
     model = load_whisper_model()
     segments, _ = model.transcribe(
         str(wav_path),
-        language="zh",
+        language=source_language_code,
         beam_size=5,
         best_of=3,
         vad_filter=True,
@@ -1800,12 +1818,12 @@ def build_source_srt(cues):
     return "\n\n".join(blocks).strip()
 
 
-def transcribe_video_to_source_srt(video_path):
-    """FFmpeg + Whisper only. No Gemini key is required."""
+def transcribe_video_to_source_srt(video_path, source_language_code="zh"):
+    """FFmpeg + Whisper only, using the selected source-language code."""
     with tempfile.TemporaryDirectory() as folder:
         audio_path = Path(folder) / "audio_16k.wav"
         extract_audio(Path(video_path), audio_path)
-        cues = transcribe_with_whisper(audio_path)
+        cues = transcribe_with_whisper(audio_path, source_language_code)
         source_srt = build_source_srt(cues)
         if not source_srt or "-->" not in source_srt:
             raise RuntimeError("មិនអាចបង្កើត Source SRT ពីវីដេអូបានទេ។")
@@ -1857,10 +1875,12 @@ def test_gemini_vault_key(api_key_value, selected_model):
 
 
 def _translate_batch_text_only(
-    client, model_name, batch, previous_context="", translation_style=DEFAULT_TRANSLATION_STYLE
+    client, model_name, batch, previous_context="", translation_style=DEFAULT_TRANSLATION_STYLE,
+    source_language=DEFAULT_SOURCE_LANGUAGE,
 ):
-    """Translate Whisper text only. This avoids costly video upload requests."""
+    """Translate selected-language source text to Khmer without video upload requests."""
     style_instructions = translation_style_instruction(translation_style)
+    source_details = source_language_details(source_language)
     cue_lines = "\n".join(
         f'ID={cue["id"]} | TIME={seconds_to_srt(cue["start"])} --> '
         f'{seconds_to_srt(cue["end"])} | MAX_WORDS={cue_word_limit(cue["start"], cue["end"])} '
@@ -1869,7 +1889,7 @@ def _translate_batch_text_only(
     )
     prompt = f"""
 You are an Expert Subtitler and Dubbing Translator for AI KHEMRA BRO.
-Translate every SOURCE line into standard Khmer movie-dialogue SRT for dubbing.
+Translate every SOURCE line from {source_details['name']} into standard Khmer movie-dialogue SRT for dubbing. The target language is always Khmer.
 
 THE FOLLOWING SIX RULES ARE MANDATORY:
 1. NATURAL SPOKEN KHMER: Never translate word-for-word. Use smooth, everyday Khmer that Cambodian people naturally say. Use appropriate emotion particles such as ណា, ណ៎, ហ្មង, តើ, អញ្ចឹង, វើយ, ហាស, ចា៎, or ចុះ only when the scene supports them.
@@ -1910,7 +1930,8 @@ CUES:
 
 
 def translate_cues_text_only(
-    api_keys, model_name, cues, translation_style=DEFAULT_TRANSLATION_STYLE
+    api_keys, model_name, cues, translation_style=DEFAULT_TRANSLATION_STYLE,
+    source_language=DEFAULT_SOURCE_LANGUAGE,
 ):
     """Translate in large ordered batches, rotating through every saved Gemini key."""
     if isinstance(api_keys, str):
@@ -1940,7 +1961,8 @@ def translate_cues_text_only(
                 try:
                     client = genai.Client(api_key=api_key_value)
                     return _translate_batch_text_only(
-                        client, model_name, request_batch, context, translation_style
+                        client, model_name, request_batch, context, translation_style,
+                        source_language,
                     )
                 except Exception as exc:
                     last_error = exc
@@ -2018,6 +2040,7 @@ def video_to_srt(
     translation_style=DEFAULT_TRANSLATION_STYLE,
     translation_provider="Gemini",
     google_api_key="",
+    source_language=DEFAULT_SOURCE_LANGUAGE,
 ):
     """
     Reliable v5.5 path:
@@ -2032,7 +2055,9 @@ def video_to_srt(
         with tempfile.TemporaryDirectory() as folder:
             audio_path = Path(folder) / "audio_16k.wav"
             extract_audio(Path(video_path), audio_path)
-            cues = transcribe_with_whisper(audio_path)
+            cues = transcribe_with_whisper(
+                audio_path, source_language_details(source_language)["code"]
+            )
     else:
         cues = prepared_cues
     if not cues:
@@ -2052,7 +2077,7 @@ def video_to_srt(
     for model_name in _candidate_gemini_models(model):
         try:
             translated = translate_cues_text_only(
-                api_keys, model_name, cues, translation_style
+                api_keys, model_name, cues, translation_style, source_language
             )
             result = build_srt(cues, translated)
             if not result.strip() or "-->" not in result:
@@ -3318,6 +3343,8 @@ if st.session_state.get("settings_owner_code") != settings_owner_code:
 for state_key, default_value in ACCOUNT_SETTINGS_DEFAULTS.items():
     if state_key not in st.session_state:
         st.session_state[state_key] = default_value
+if st.session_state.get("source_language") not in SOURCE_LANGUAGE_OPTIONS:
+    st.session_state.source_language = DEFAULT_SOURCE_LANGUAGE
 if st.session_state.get("translation_style") not in TRANSLATION_STYLE_OPTIONS:
     st.session_state.translation_style = DEFAULT_TRANSLATION_STYLE
 if st.session_state.get("translation_provider") not in TRANSLATION_PROVIDER_OPTIONS:
@@ -3373,11 +3400,14 @@ if st.session_state.settings_drawer_open:
                 st.session_state.pop(key, None)
             st.rerun()
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🌍 Target Language (ភាសាគោលដៅ)</h3>', unsafe_allow_html=True)
-        st.caption("ជ្រើសរើសភាសា (Select Language):")
+        st.markdown('<h3 class="settings-drawer-section">🌍 Translation Languages</h3>', unsafe_allow_html=True)
+        st.selectbox(
+            "Source Language", list(SOURCE_LANGUAGE_OPTIONS), key="source_language",
+            on_change=account_settings_changed,
+        )
         st.selectbox(
             "Target Language", ["Khmer (ខ្មែរ)"], key="target_language",
-            on_change=account_settings_changed, label_visibility="collapsed",
+            on_change=account_settings_changed,
         )
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
@@ -3428,6 +3458,7 @@ if st.session_state.settings_drawer_open:
 api_keys_text = st.session_state.get("api_keys_manager", "")
 valid_api_keys = active_private_api_keys(api_keys_text)
 api_key = valid_api_keys[0] if valid_api_keys else ""
+source_language = st.session_state.source_language
 translation_style = st.session_state.translation_style
 translation_provider = st.session_state.translation_provider
 google_translate_api_key = st.session_state.get("google_translate_api_key", "").strip()
@@ -3491,7 +3522,11 @@ with tab_video:
 
                     # Stage 1 always works without Gemini: create source SRT once.
                     with ThreadPoolExecutor(max_workers=1) as executor:
-                        future = executor.submit(transcribe_video_to_source_srt, video_path)
+                        future = executor.submit(
+                            transcribe_video_to_source_srt,
+                            video_path,
+                            source_language_details(source_language)["code"],
+                        )
                         while not future.done():
                             elapsed = time.time() - started_at
                             asr_estimate_seconds = max(25.0, duration_seconds * 0.18)
@@ -3518,6 +3553,7 @@ with tab_video:
                                     translation_style,
                                     translation_provider,
                                     google_translate_api_key,
+                                    source_language,
                                 )
                                 while not future.done():
                                     elapsed = time.time() - started_at
@@ -3734,18 +3770,18 @@ with tab_video:
 
 with tab_translate:
     st.header("AI Subtitle Translator")
-    st.info("បិទភ្ជាប់ Chinese SRT ហើយបកប្រែទៅ Khmer SRT ជាភាសាខ្មែរធម្មជាតិ ស្អាតសម្រាប់ទស្សនិកជនទូទៅ និងរក្សា timestamp ដើម។")
-    source_srt = st.text_area("Chinese SRT", height=SRT_INPUT_HEIGHT, key="translator_source")
+    st.info("បិទភ្ជាប់ Source SRT ហើយបកប្រែទៅ Khmer SRT ដោយរក្សា timestamp ដើម។")
+    source_srt = st.text_area("Source SRT", height=SRT_INPUT_HEIGHT, key="translator_source")
     if st.button("🌐 Translate to Khmer", key="translate_btn"):
         if not source_srt.strip():
-            st.warning("សូមបញ្ចូល Chinese SRT។")
+            st.warning("សូមបញ្ចូល Source SRT។")
         elif not provider_ready:
             st.error("សូមបញ្ចូល API Key សម្រាប់អ្នកផ្ដល់សេវាដែលបានជ្រើសក្នុង ☰ Settings។")
         else:
             try:
                 source_cues = srt_to_structured_cues(source_srt)
                 if not source_cues:
-                    raise ValueError("Chinese SRT មិនត្រឹមត្រូវ។")
+                    raise ValueError("Source SRT មិនត្រឹមត្រូវ។")
                 if translation_provider == "Google Cloud Translation":
                     translated_map = translate_cues_with_google(source_cues, google_translate_api_key)
                 else:
@@ -3761,7 +3797,8 @@ with tab_translate:
                         for cue in source_cues
                     ]
                     translated_map = translate_cues_text_only(
-                        valid_api_keys, model, normalized_cues, translation_style
+                        valid_api_keys, model, normalized_cues, translation_style,
+                        source_language,
                     )
                 blocks = []
                 for cue in source_cues:
