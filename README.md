@@ -1,4 +1,4 @@
-# AI KHEMRA BRO v6.7.12
+# AI KHEMRA BRO v6.7.14
 
 AI KHEMRA BRO is a mobile-first Streamlit application for turning video dialogue or supplied subtitle text into translated SRT subtitles and dubbed MP3 audio. The **application interface is English-first**. It supports Khmer, English, Simplified Chinese, Korean, and Vietnamese output, while preserving the Khmer-specific subtitle and TTS rules required for natural Khmer dubbing.
 
@@ -7,7 +7,7 @@ AI KHEMRA BRO is a mobile-first Streamlit application for turning video dialogue
 Upload only these five files to the root of the Streamlit Community Cloud or Railway GitHub repository.
 
 | File | Purpose |
-|---|---|
+| --- | --- |
 | `app.py` | Complete Streamlit application, mobile UI, subtitle pipeline, and audio pipeline. |
 | `requirements.txt` | Python dependencies installed by Streamlit Community Cloud or Railway. |
 | `packages.txt` | System dependency declaration for `ffmpeg`. |
@@ -16,9 +16,9 @@ Upload only these five files to the root of the Streamlit Community Cloud or Rai
 
 ## Streamlit Secrets
 
-Create the following secrets in Streamlit Community Cloud. **Never place API keys or passwords in `app.py`, GitHub, or this README.**
+Create the following secrets in Streamlit Community Cloud. **Never place API keys or passwords in ****`app.py`****, GitHub, or this README.**
 
-```toml
+```
 COOKIE_SECRET = "use-a-long-random-secret"
 GEMINI_API_KEYS = "AIza..."
 LICENSE_PEPPER = "use-a-separate-long-random-secret"
@@ -42,7 +42,7 @@ Upload the same five files above to the **root** of the GitHub repository connec
 In Railway, configure these values in the service dashboard instead of adding Docker or script files:
 
 | Railway setting | Value |
-|---|---|
+| --- | --- |
 | **Variable** | `RAILPACK_PYTHON_VERSION=3.12` |
 | **Deploy Start Command** | `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true --browser.gatherUsageStats false` |
 | **Variable** | `COOKIE_SECRET` = long random private value |
@@ -85,7 +85,7 @@ This package supports independent browser sessions and does not device-lock an A
 A single Streamlit application with its local `licenses.db` file must not be represented as a 10,000-user multi-server system. For genuine multi-instance scale, migrate the shared state before adding replicas:
 
 | Scale layer | Required production component | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | Customer accounts and Access Codes | One shared managed relational database | Ensures every app instance validates the same active code and expiry state. |
 | Videos, SRTs, and MP3s | Private object storage with per-job paths and short-lived download links | Keeps customer media out of local server disks and prevents one job from reading another job’s files. |
 | Whisper, FFmpeg, and TTS work | Shared job queue plus dedicated media workers | Limits expensive media work globally, rather than only inside one web process. |
@@ -104,10 +104,10 @@ If a hosting update does not retain the prior `licenses.db`, upload that backup 
 
 ## Settings and Workflows
 
-The visible **AI Translate Controller** presents the Gemini model, target language, translation style, source language, workflow, processing mode, 4G Lite Mode, API-key entry, Clear Video, and Save & Apply controls in one ordered mobile panel. Its temporary close button does not change any saved preference; use **Open Controller** to show it again. The target language, Gemini model, and translation style remain private to the signed-in customer.
+The visible **AI Translate Controller** uses one ordered mobile panel: Account Profile and Plan, Log out, Target Language, API Keys Manager, Translation Style, Source/Workflow, Audio Sync Mode, Voice Mode status, AI Model, Clear Video, and Save & Apply. It exposes only controls already supported by the app; the Gemini translation engine and automatic speaker tags remain active without adding a non-functional alternative. Its temporary close button does not change any saved preference; use **Open Controller** to show it again. The target language, Gemini model, and translation style remain private to the signed-in customer.
 
 | Workflow | Result |
-|---|---|
+| --- | --- |
 | **Automatic Khmer SRT** | Extracts dialogue from the video and returns a translated, tagged SRT. |
 | **Khmer SRT + MP3** | Generates the translated SRT and then produces its dubbed MP3. |
 | **Source SRT only** | Extracts the source-language SRT without translation. |
@@ -130,13 +130,13 @@ The application keeps SRT cue IDs and timestamps locked. Before output, it verif
 Each subtitle cue must begin with one of the following tags.
 
 | Tag | Use |
-|---|---|
+| --- | --- |
 | `[M]` | Male dialogue spoken aloud. |
 | `[F]` | Female dialogue spoken aloud. |
 | `[M_THINK]` | Male inner thought that other characters cannot hear. |
 | `[F_THINK]` | Female inner thought that other characters cannot hear. |
 
-`[M_THINK]` and `[F_THINK]` are rendered at **60% of normal dialogue volume**: a 40% reduction that keeps inner thoughts clearly audible while distinguishing them from spoken dialogue. In v6.7.10, thought speech also uses a clearly calmer pace, gentle pitch shift, and a warm, narrower speech band, so it no longer sounds like ordinary dialogue. Thought voices do not add echo or reverb. The audio pipeline retains natural phrasing, avoids forced speed increases, applies gentle cue joins where appropriate, and performs final loudness leveling.
+`[M_THINK]` and `[F_THINK]` are rendered at **60% of normal dialogue volume**: a 40% reduction that keeps inner thoughts clearly audible while distinguishing them from spoken dialogue. Thought speech also uses a clearly calmer pace, gentle pitch shift, and a warm, narrower speech band, so it no longer sounds like ordinary dialogue. Thought voices do not add echo or reverb. In v6.7.14, MP3 creation requires every SRT cue to begin with an explicit supported tag and locks it to its matching male/female dialogue or inner-thought voice. Missing or invalid tags stop audio generation with a clear correction message instead of silently becoming a different voice. The audio pipeline retains natural phrasing, avoids forced speed increases, applies gentle cue joins where appropriate, and performs final loudness leveling.
 
 ## Do Not Upload
 
