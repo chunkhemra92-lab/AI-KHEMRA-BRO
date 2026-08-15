@@ -3371,12 +3371,17 @@ with license_connection() as _lock_cleanup_connection:
         "UPDATE licenses SET active_session_hash=NULL, active_session_last_seen=NULL"
     )
     _lock_cleanup_connection.commit()
+# The private admin route is completely separate from the customer route.
+# A customer URL never renders management controls, even if the same browser
+# previously visited the owner URL.
 admin_route_requested = private_admin_route_requested()
 if admin_route_requested:
     st.session_state.admin_gate_visible = True
-if admin_route_requested or st.session_state.get("admin_authenticated", False):
     admin_dashboard()
     st.stop()
+if st.session_state.get("admin_authenticated", False):
+    st.session_state.admin_authenticated = False
+    st.session_state.admin_gate_visible = False
 
 if not st.session_state.get("customer_authenticated", False):
     # Restore login automatically after refresh, phone restart, or app update.
