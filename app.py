@@ -558,6 +558,24 @@ VOICE_PROFILES={
 'OLD_F':{'voice':SREYMOM,'rate':'-8%','pitch':'-3Hz','volume':'+8%'}
 }
 
+# Compact voice tags are the only labels written into generated SRT files.
+# Detailed legacy tags remain supported on input and map to the requested
+# male, female, and inner-thought voices without changing the application UI.
+COMPACT_VOICE_TAGS = ("M", "F", "M_THINK", "F_THINK")
+
+
+def compact_voice_tag(tag):
+    """Convert legacy age/role tags into the four public SRT voice tags."""
+    normalized = str(tag or "M").upper().strip()
+    if normalized == "M_THINK":
+        return "M_THINK"
+    if normalized == "F_THINK":
+        return "F_THINK"
+    if normalized in {"F", "GIRL", "F_YOUNG", "F_ADULT", "F_OLD", "NARRATOR_F", "OLD_F"}:
+        return "F"
+    return "M"
+
+
 # Smooth-dubbing controls: gentle fades remove clicks/cuts when speaker labels change.
 VOICE_FADE_IN_SECONDS = 0.045
 VOICE_FADE_OUT_SECONDS = 0.070
@@ -661,15 +679,15 @@ Return a JSON array only with exactly:
 {"id": integer, "tag": string, "text": string}
 
 Allowed tags:
-BOY, GIRL, M_YOUNG, F_YOUNG, M_ADULT, F_ADULT, M_OLD, F_OLD, M_THINK, F_THINK, NARRATOR_M, NARRATOR_F
+M, F, M_THINK, F_THINK
 
 Rules:
 - Return exactly one object per cue ID in the same order.
 - Do not alter timestamps, cue count, or cue order.
 - Keep recurring character identity and tag consistent across nearby cues.
-- Ordinary audible dialogue must use the correct age-and-gender label, even when calm, soft, sad, angry, or whispering.
-- Use THINK only for unheard internal monologue; use NARRATOR only for true narration.
-- Use BOY/GIRL and M_OLD/F_OLD only when age is clearly supported; use M_YOUNG/F_YOUNG for young speakers and M_ADULT/F_ADULT for adults.
+- Use M for male dialogue and F for female dialogue, even when calm, soft, sad, angry, or whispering.
+- Use M_THINK or F_THINK only for unheard internal monologue. Treat narration as M or F according to the narrator's voice.
+- Preserve natural spoken Khmer, relationship-appropriate pronouns, emotional depth, and concise timing from the supplied dialogue.
 - Rewrite Khmer into fluent, natural everyday Cambodian dialogue suitable for professional movie dubbing; never use stiff word-for-word or book-like phrasing.
 - Read each Khmer line as spoken dialogue: if a Cambodian would not normally say it that way, rewrite it using shorter and more familiar wording.
 - Respect each cue's MAX_WORDS strictly so dubbing can play at a normal pace.
@@ -1614,13 +1632,15 @@ def translate_cues(client, model_name, uploaded_video, cues):
 
 
 def build_srt(cues, translated):
+    """Return plain SRT using only the four requested, tag-driven voice labels."""
     blocks = []
     for cue in cues:
         item = translated[cue["id"]]
+        tag = compact_voice_tag(item.get("tag", "M"))
         blocks.append(
             f'{cue["id"]}\n'
             f'{seconds_to_srt(cue["start"])} --> {seconds_to_srt(cue["end"])}\n'
-            f'[{item["tag"]}] {item["text"]}'
+            f'[{tag}] {item["text"]}'
         )
     return "\n\n".join(blocks)
 
@@ -1811,26 +1831,27 @@ def _translate_batch_text_only(
     style_instructions = translation_style_instruction(translation_style)
     cue_lines = "\n".join(
         f'ID={cue["id"]} | TIME={seconds_to_srt(cue["start"])} --> '
-        f'{seconds_to_srt(cue["end"])} | SOURCE={cue["source"]}'
+        f'{seconds_to_srt(cue["end"])} | MAX_WORDS={cue_word_limit(cue["start"], cue["end"])} '
+        f'| SOURCE={cue["source"]}'
         for cue in batch
     )
     prompt = f"""
-You are the Khmer subtitle translation engine for AI KHEMRA BRO.
-Translate every SOURCE line into Khmer for movie dubbing.
+You are an Expert Subtitler and Dubbing Translator for AI KHEMRA BRO.
+Translate every SOURCE line into standard Khmer movie-dialogue SRT for dubbing.
 
-SELECTED TRANSLATION STYLE (MANDATORY; override default tone guidance when different):
+THE FOLLOWING SIX RULES ARE MANDATORY:
+1. NATURAL SPOKEN KHMER: Never translate word-for-word. Use smooth, everyday Khmer that Cambodian people naturally say. Use appropriate emotion particles such as ណា, ណ៎, ហ្មង, តើ, អញ្ចឹង, វើយ, ហាស, ចា៎, or ចុះ only when the scene supports them.
+2. MATCH THE ACTOR: Choose pronouns and forms of address that fit each speaker's age, status, relationship, and scene context, including បង/អូន, ឯង/អញ, ខ្ញុំ/លោក, ពួកម៉ាក, សម្លាញ់, and អា when appropriate.
+3. EMOTIONAL DEPTH: Preserve anger, humour, tears, warmth, sarcasm, fear, shock, romance, and hidden meaning. Recreate idioms and wordplay naturally in Khmer instead of translating them literally.
+4. SUBTITLE TIMING: Keep the original ID and timestamps unchanged. Each line must be concise enough for MAX_WORDS and its exact time slot, but never delete a spoken meaning, short reply, name, number, negation, filler, cry, or reaction.
+5. AUDIO TYPES AND TAGS: Select exactly one tag for the actual speaker: M for male dialogue, F for female dialogue, M_THINK for a male character's unheard inner thought, or F_THINK for a female character's unheard inner thought. Do not use any other tag.
+6. OUTPUT FORMAT: Return every input ID exactly once and in order. The application converts your JSON into SRT. Return JSON only, with no markdown, code block, heading, note, Chinese, Thai, Vietnamese, or English dialogue in text.
+
+SELECTED TRANSLATION STYLE (MANDATORY):
 {style_instructions}
 
-STRICT RULES:
-1. Return JSON array only. No markdown and no explanation.
-2. Return every input ID exactly once and in the same order.
-3. Never change, merge, split, or invent IDs.
-4. Do not omit short replies, names, numbers, negations, fillers, cries, or reactions.
-5. Output Khmer only in text. Do not leave Chinese, Thai, Vietnamese, or English dialogue.
-6. Keep each line concise enough for its timestamp, but preserve the full meaning.
-7. Select one tag: M_ADULT, F_ADULT, M_OLD, F_OLD, BOY, GIRL,
-   M_THINK, F_THINK, NARRATOR_M, NARRATOR_F.
-8. JSON format: [{{"id":1,"tag":"M_ADULT","text":"..."}}]
+JSON FORMAT:
+[{{"id":1,"tag":"M","text":"..."}}]
 
 RECENT CONTEXT:
 {previous_context or '(none)'}
@@ -1849,9 +1870,7 @@ CUES:
             continue
         if cue_id not in allowed_ids:
             continue
-        tag = str(row.get("tag", "M_ADULT")).upper().strip()
-        if tag not in VOICE_PROFILES:
-            tag = "M_ADULT"
+        tag = compact_voice_tag(row.get("tag", "M"))
         dialogue = normalize_dialogue(row.get("text", ""))
         if dialogue and not contains_cjk(dialogue):
             parsed[cue_id] = {"tag": tag, "text": dialogue}
@@ -2048,9 +2067,7 @@ def analyze_inner_thoughts(srt_text, api_key, model_name, video_path=None):
                 cue_id = int(item.get("id"))
             except (TypeError, ValueError, AttributeError):
                 continue
-            tag = str(item.get("tag", "M")).upper().strip()
-            if tag not in VOICE_PROFILES:
-                tag = "M_ADULT"
+            tag = compact_voice_tag(item.get("tag", "M"))
             dialogue = str(item.get("text", "")).strip()
             if dialogue:
                 updated[cue_id] = {"tag": tag, "text": dialogue}
@@ -2058,10 +2075,12 @@ def analyze_inner_thoughts(srt_text, api_key, model_name, video_path=None):
     blocks = []
     for cue in cues:
         item = updated.get(cue["id"], {"tag": cue["tag"], "text": cue["text"]})
+        tag = compact_voice_tag(item.get("tag", cue.get("tag", "M")))
         blocks.append(
             f'{cue["id"]}\n{ms_to_srt(cue["start_ms"])} --> {ms_to_srt(cue["end_ms"])}\n'
-            f'[{item["tag"]}] {item["text"]}'
+            f'[{tag}] {item["text"]}'
         )
+
     return "\n\n".join(blocks)
 
 def parse_srt(srt_text):
@@ -3674,30 +3693,41 @@ with tab_translate:
                 if translation_provider == "Google Cloud Translation":
                     translated_map = translate_cues_with_google(source_cues, google_translate_api_key)
                 else:
-                    client = genai.Client(api_key=api_key)
-                    translated_map = {}
-                    for offset in range(0, len(source_cues), 35):
-                        batch = source_cues[offset:offset + 35]
-                        payload = "\n".join(
-                            f'ID={cue["id"]} | SOURCE={cue["text"]}' for cue in batch
-                        )
-                        response = gemini_generate_with_retry(
-                            client, model, translation_prompt_for_style(translation_style) + "\n\nCUES:\n" + payload
-                        )
-                        for item in parse_json_array(response.text or ""):
-                            cue_id = int(item.get("id"))
-                            tag = str(item.get("tag", "M")).upper()
-                            if tag not in VOICE_PROFILES:
-                                tag = "M_ADULT"
-                            translated_map[cue_id] = {"tag": tag, "text": str(item.get("text", "")).strip()}
+                    if not valid_api_keys:
+                        raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
+                    normalized_cues = [
+                        {
+                            "id": cue["id"],
+                            "start": cue["start_ms"] / 1000.0,
+                            "end": cue["end_ms"] / 1000.0,
+                            "source": cue["text"],
+                        }
+                        for cue in source_cues
+                    ]
+                    last_error = None
+                    translated_map = None
+                    for api_key_value in valid_api_keys:
+                        try:
+                            client = genai.Client(api_key=api_key_value)
+                            translated_map = translate_cues_text_only(
+                                client, model, normalized_cues, translation_style
+                            )
+                            break
+                        except Exception as exc:
+                            last_error = exc
+                            if not (is_quota_error(exc) or is_invalid_key_error(exc)):
+                                raise
+                    if translated_map is None:
+                        raise RuntimeError(friendly_ai_error(last_error, len(valid_api_keys)))
                 blocks = []
                 for cue in source_cues:
                     item = translated_map.get(cue["id"])
                     if not item or not item["text"]:
                         raise RuntimeError(f'បកប្រែមិនអស់បន្ទាត់ {cue["id"]}')
+                    tag = compact_voice_tag(item.get("tag", "M"))
                     blocks.append(
                         f'{cue["id"]}\n{ms_to_srt(cue["start_ms"])} --> {ms_to_srt(cue["end_ms"])}\n'
-                        f'[{item["tag"]}] {item["text"]}'
+                        f'[{tag}] {item["text"]}'
                     )
                 st.session_state.srt_text = "\n\n".join(blocks)
                 st.session_state.pending_editor_update = st.session_state.srt_text
