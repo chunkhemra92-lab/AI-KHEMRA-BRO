@@ -1,4 +1,4 @@
-# AI KHEMRA BRO v6.7.14
+# AI KHEMRA BRO v6.7.15
 
 AI KHEMRA BRO is a mobile-first Streamlit application for turning video dialogue or supplied subtitle text into translated SRT subtitles and dubbed MP3 audio. The **application interface is English-first**. It supports Khmer, English, Simplified Chinese, Korean, and Vietnamese output, while preserving the Khmer-specific subtitle and TTS rules required for natural Khmer dubbing.
 
@@ -104,7 +104,7 @@ If a hosting update does not retain the prior `licenses.db`, upload that backup 
 
 ## Settings and Workflows
 
-The visible **AI Translate Controller** uses one ordered mobile panel: Account Profile and Plan, Log out, Target Language, API Keys Manager, Translation Style, Source/Workflow, Audio Sync Mode, Voice Mode status, AI Model, Clear Video, and Save & Apply. It exposes only controls already supported by the app; the Gemini translation engine and automatic speaker tags remain active without adding a non-functional alternative. Its temporary close button does not change any saved preference; use **Open Controller** to show it again. The target language, Gemini model, and translation style remain private to the signed-in customer.
+The visible **AI Translate Controller** offers two mobile layouts. **Style 1: Important** is a small quick panel with target-language selection, workflow selection, API-key status, Clear Video, and Save & Apply. **Style 2: Detailed** is a tall, compact vertical panel with the complete existing controller: Account Profile and Plan, Log out, target language, API Keys Manager, Translation Style, Source/Workflow, Audio Sync Mode, Voice Mode status, AI Model, Clear Video, and Save & Apply. Target languages use flag icons with Khmer display names: ភាសាខ្មែរ, ភាសាអង់គ្លេស, ភាសាចិន, ភាសាកូរ៉េ, and ភាសាវៀតណាម. It exposes only controls already supported by the app; the Gemini translation engine and automatic speaker tags remain active without adding a non-functional alternative. The target language, Gemini model, and translation style remain private to the signed-in customer.
 
 | Workflow | Result |
 | --- | --- |
