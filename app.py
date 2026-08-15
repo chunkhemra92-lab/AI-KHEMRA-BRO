@@ -482,6 +482,12 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-google_ai_studio_link a{min-height:42px!important;border:1px solid #30d5f2!important;border-radius:12px!important;background:#12384b!important;color:#ffffff!important;font-weight:850!important;box-shadow:none!important}
 .st-key-connect_google_ai_studio button{min-height:48px!important;border-radius:12px!important;background:linear-gradient(90deg,#0b87cd,#22d3ee)!important}
 .google-ai-studio-status{margin:9px 0 0!important;padding:9px 10px!important;border:1px solid rgba(34,211,238,.45)!important;border-radius:12px!important;background:rgba(8,145,178,.13)!important;color:#d8f7ff!important;font-size:13px!important;font-weight:750!important;line-height:1.45!important}
+.settings-ai-connection-banner{margin:0 0 12px!important;padding:13px 14px!important;border:1px solid rgba(34,211,238,.48)!important;border-radius:16px!important;background:linear-gradient(135deg,rgba(14,116,144,.26),rgba(8,47,73,.28))!important;box-shadow:inset 0 1px rgba(255,255,255,.05)!important}
+.settings-ai-connection-banner strong{display:block!important;color:#ecfeff!important;font-size:16px!important;font-weight:950!important;letter-spacing:.1px!important}
+.settings-ai-connection-banner span{display:block!important;margin-top:4px!important;color:#a5f3fc!important;font-size:12px!important;font-weight:700!important;line-height:1.4!important}
+.st-key-settings_drawer [data-testid="stTextArea"] textarea{min-height:92px!important;border-radius:14px!important;box-shadow:inset 0 0 0 1px rgba(148,163,184,.16)!important}
+.st-key-settings_drawer [data-testid="stSelectbox"] > div{border-radius:14px!important}
+.st-key-settings_drawer .stCaption{color:#b9c8dc!important;line-height:1.48!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
@@ -732,7 +738,11 @@ ACCOUNT_SETTINGS_DEFAULTS = {
 }
 
 
-API_COOKIE_NAME = "ai_khemra_bro_private_api"
+# Browser cache v2: it contains an account-bound, Fernet-encrypted envelope only.
+# Raw API keys are never written to browser local storage or cookies.
+LEGACY_API_COOKIE_NAME = "ai_khemra_bro_private_api"
+API_BROWSER_CACHE_NAME = "ai_khemra_bro_private_api_v2"
+API_BROWSER_CACHE_TTL_DAYS = 30
 COOKIE_SECRET_CONFIGURED = False
 
 try:
@@ -797,8 +807,85 @@ def _load_api_keys_from_account():
         return ""
 
 
+def _browser_cache_account_fingerprint():
+    """Bind the encrypted browser cache to exactly one Access Code account."""
+    code = _current_customer_code()
+    if not code:
+        return ""
+    return hmac.new(
+        raw_cookie_secret.encode("utf-8"),
+        code.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def encrypt_browser_api_cache(api_keys_text):
+    """Create an encrypted, account-bound browser-cache envelope for API keys."""
+    cleaned = "\n".join(
+        line.strip() for line in str(api_keys_text or "").splitlines() if line.strip()
+    )
+    fingerprint = _browser_cache_account_fingerprint()
+    if not cleaned or not fingerprint:
+        return ""
+    envelope = json.dumps(
+        {"version": 2, "account": fingerprint, "keys": cleaned},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return api_cipher.encrypt(envelope.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_browser_api_cache(cache_value):
+    """Read only a valid, unexpired cache belonging to the current Access Code."""
+    if not cache_value:
+        return ""
+    try:
+        raw = api_cipher.decrypt(
+            str(cache_value).encode("utf-8"),
+            ttl=API_BROWSER_CACHE_TTL_DAYS * 24 * 60 * 60,
+        ).decode("utf-8")
+        envelope = json.loads(raw)
+        if not isinstance(envelope, dict) or envelope.get("version") != 2:
+            return ""
+        current_fingerprint = _browser_cache_account_fingerprint()
+        cached_fingerprint = str(envelope.get("account") or "")
+        if not current_fingerprint or not hmac.compare_digest(cached_fingerprint, current_fingerprint):
+            return ""
+        return "\n".join(
+            line.strip() for line in str(envelope.get("keys") or "").splitlines() if line.strip()
+        )
+    except (InvalidToken, ValueError, TypeError, json.JSONDecodeError):
+        return ""
+
+
+def _load_browser_api_cache():
+    """Load the encrypted, account-bound browser fallback; never trust legacy cache data."""
+    try:
+        cached = decrypt_browser_api_cache(cookie_manager.get(API_BROWSER_CACHE_NAME))
+    except Exception:
+        cached = ""
+    # Legacy browser-only values are not account-bound, so discard them rather
+    # than risk moving another customer's key to the current Access Code.
+    try:
+        cookie_manager.delete(LEGACY_API_COOKIE_NAME, key="retire_legacy_api_cookie")
+    except Exception:
+        pass
+    return cached
+
+
+def load_private_api_keys():
+    """Load account encryption first, then the safe account-bound browser cache."""
+    account_keys = _load_api_keys_from_account()
+    if account_keys:
+        return account_keys
+    browser_keys = _load_browser_api_cache()
+    if browser_keys:
+        _save_api_keys_to_account(browser_keys)
+    return browser_keys
+
+
 def _save_api_keys_to_account(api_keys_text):
-    """Save encrypted API keys against the signed-in account, not only Safari."""
+    """Save encrypted API keys against the signed-in account, not only one browser."""
     code = _current_customer_code()
     if not code:
         return False
@@ -819,49 +906,38 @@ def _save_api_keys_to_account(api_keys_text):
         return False
 
 
-def load_private_api_keys():
-    """Load from the account database first; Safari cookie is only a fallback."""
-    account_keys = _load_api_keys_from_account()
-    if account_keys:
-        return account_keys
-    try:
-        browser_keys = decrypt_api_keys(cookie_manager.get(API_COOKIE_NAME))
-    except Exception:
-        browser_keys = ""
-    # Migrate an old browser-only saved key into the signed-in account.
-    if browser_keys:
-        _save_api_keys_to_account(browser_keys)
-    return browser_keys
-
-
 def save_private_api_keys(api_keys_text):
-    """Persist keys in the customer account DB and also keep a browser fallback."""
+    """Encrypt in the account DB and keep only a short-lived encrypted browser cache."""
     cleaned = "\n".join(
         line.strip() for line in str(api_keys_text or "").splitlines() if line.strip()
     )
     saved_to_account = _save_api_keys_to_account(cleaned)
     try:
-        if cleaned:
+        if cleaned and saved_to_account:
             cookie_manager.set(
-                API_COOKIE_NAME,
-                encrypt_api_keys(cleaned),
-                expires_at=datetime.datetime.now() + datetime.timedelta(days=7300),
-                key="save_private_api_cookie",
+                API_BROWSER_CACHE_NAME,
+                encrypt_browser_api_cache(cleaned),
+                expires_at=datetime.datetime.now() + datetime.timedelta(days=API_BROWSER_CACHE_TTL_DAYS),
+                key="save_account_bound_api_cache",
             )
+            cookie_manager.delete(LEGACY_API_COOKIE_NAME, key="delete_legacy_api_cache")
         else:
-            cookie_manager.delete(API_COOKIE_NAME, key="delete_private_api_cookie")
+            cookie_manager.delete(API_BROWSER_CACHE_NAME, key="delete_account_bound_api_cache")
+            cookie_manager.delete(LEGACY_API_COOKIE_NAME, key="delete_legacy_api_cache")
     except Exception:
         pass
     return saved_to_account
 
 
 def delete_private_api_keys():
-    """Delete the key only when the user explicitly presses Delete Key."""
+    """Delete persistent encrypted keys and every browser-cache variant explicitly."""
     _save_api_keys_to_account("")
     try:
-        cookie_manager.delete(API_COOKIE_NAME, key="delete_private_api_cookie_explicit")
+        cookie_manager.delete(API_BROWSER_CACHE_NAME, key="delete_account_bound_api_cache_explicit")
+        cookie_manager.delete(LEGACY_API_COOKIE_NAME, key="delete_legacy_api_cache_explicit")
     except Exception:
         pass
+
 
 def _load_account_settings():
     """Load encrypted settings that belong only to the signed-in Access Code."""
@@ -2965,6 +3041,12 @@ st.caption(f"👤 {login_row['customer_name']}")
 # Read this browser's saved key once per Streamlit session.
 if "api_keys_manager" not in st.session_state:
     st.session_state.api_keys_manager = load_private_api_keys()
+# Never prefill a visible widget with saved secrets. The backend session keeps
+# keys only for processing; the connection input starts blank on every new session.
+if st.session_state.pop("clear_api_key_input_after_save", False):
+    st.session_state.pop("api_keys_input", None)
+if "api_keys_input" not in st.session_state:
+    st.session_state.api_keys_input = ""
 
 # Saved settings belong to the Access Code, so the same customer sees the same
 # choices on every phone without affecting other customer accounts.
@@ -3037,6 +3119,7 @@ if st.session_state.settings_drawer_open:
         )
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔗 Connect Google AI Studio</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="settings-ai-connection-banner"><strong>🔒 Encrypted API Key Vault</strong><span>សោត្រូវបានអ៊ិនគ្រីបតាម Access Code និងមិនបង្ហាញឡើងវិញក្រោយពេលរក្សាទុក។</span></div>', unsafe_allow_html=True)
         st.caption("ភ្ជាប់ Gemini API Key ដើម្បីប្រើ Google AI Studio សម្រាប់ការបកប្រែ។")
         st.link_button(
             "🌐 បង្កើត Gemini API Key ក្នុង Google AI Studio",
@@ -3047,19 +3130,28 @@ if st.session_state.settings_drawer_open:
         st.caption("1. បើកតំណខាងលើ  2. បង្កើត API Key  3. បិទភ្ជាប់សោខាងក្រោម")
         st.text_area(
             "Gemini API Key", height=92, placeholder="AIza... (one key per line)",
-            key="api_keys_manager", label_visibility="collapsed",
-            help="អ្នកអាចដាក់ API Key ច្រើនបាន (មួយសោក្នុងមួយជួរ)។ សោត្រូវបានអ៊ិនគ្រីបតាម Access Code នេះ។",
+            key="api_keys_input", label_visibility="collapsed",
+            help="សោក្នុងប្រអប់នេះមិនត្រូវបានបង្ហាញវិញទេ។ អ្នកអាចដាក់ API Key ច្រើនបាន (មួយសោក្នុងមួយជួរ)។",
         )
         if st.button("🔗 Connect & Save Google AI Studio", key="connect_google_ai_studio", use_container_width=True):
-            entered_keys = [line.strip() for line in st.session_state.api_keys_manager.splitlines() if line.strip()]
+            entered_keys = [line.strip() for line in st.session_state.api_keys_input.splitlines() if line.strip()]
             if entered_keys:
-                save_private_api_keys(st.session_state.api_keys_manager)
-                st.success("✅ បានភ្ជាប់ និងរក្សាទុក Gemini API Key រួចរាល់។")
+                candidate_keys = "\n".join(entered_keys)
+                if save_private_api_keys(candidate_keys):
+                    st.session_state.api_keys_manager = candidate_keys
+                    st.session_state.clear_api_key_input_after_save = True
+                    st.session_state.api_key_saved_feedback = len(entered_keys)
+                    st.rerun()
+                else:
+                    st.error("❌ មិនអាចរក្សាទុក Gemini API Key បានទេ។ សូមសាកម្ដងទៀត។")
             else:
                 st.warning("⚠️ សូមបិទភ្ជាប់ Gemini API Key ជាមុន។")
         saved_gemini_keys = [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]
+        saved_feedback_count = st.session_state.pop("api_key_saved_feedback", None)
+        if saved_feedback_count:
+            st.success(f"✅ បានអ៊ិនគ្រីប និងរក្សាទុក {saved_feedback_count} Gemini API Key រួចរាល់។")
         if saved_gemini_keys:
-            st.markdown('<p class="google-ai-studio-status">✅ Google AI Studio បានភ្ជាប់រួច។ Gemini API Key ត្រូវបានរក្សាទុកជាឯកជនតាម Access Code នេះ។</p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="google-ai-studio-status">✅ Google AI Studio ត្រូវបានភ្ជាប់រួច។ បានរក្សាទុក <strong>{len(saved_gemini_keys)}</strong> API Key ជាអ៊ិនគ្រីបតាម Access Code នេះ។ Key ពិតមិនត្រូវបានបង្ហាញម្ដងទៀតទេ។</p>', unsafe_allow_html=True)
         else:
             st.warning("⚠️ មិនទាន់បានភ្ជាប់ Google AI Studio ទេ។ សូមបង្កើត និងបិទភ្ជាប់ Gemini API Key។")
 
