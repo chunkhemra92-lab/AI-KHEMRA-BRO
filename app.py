@@ -752,11 +752,9 @@ except Exception:
 if raw_cookie_secret:
     COOKIE_SECRET_CONFIGURED = True
 else:
-    # Stable built-in fallback so an encrypted browser cookie can still be
-    # decrypted after refresh, browser close, phone restart, app redeploy, or
-    # server restart. For production, setting COOKIE_SECRET in Streamlit
-    # Secrets remains recommended, but persistence now works out of the box.
-    raw_cookie_secret = "AI-KHEMRA-BRO-PERSISTENT-PRIVATE-COOKIE-v1-2026"
+    # Never keep a reusable encryption secret in the public repository.
+    # Private Streamlit Secrets must provide COOKIE_SECRET for durable account data.
+    raw_cookie_secret = secrets.token_urlsafe(48)
 
 fernet_key = base64.urlsafe_b64encode(hashlib.sha256(raw_cookie_secret.encode("utf-8")).digest())
 api_cipher = Fernet(fernet_key)
@@ -2134,13 +2132,20 @@ def _secret(name, default=""):
 
 
 def get_admin_username():
-    return _secret("ADMIN_USERNAME", "KHEMRA")
+    return _secret("ADMIN_USERNAME")
 
 
 def get_admin_password():
-    # Works immediately even before Streamlit Secrets are configured.
-    # For production, set ADMIN_PASSWORD in Streamlit Secrets to override this bootstrap value.
-    return _secret("ADMIN_PASSWORD", "0719067125")
+    return _secret("ADMIN_PASSWORD")
+
+
+def owner_secrets_configured():
+    return bool(
+        get_admin_username()
+        and get_admin_password()
+        and _secret("COOKIE_SECRET")
+        and _secret("LICENSE_PEPPER")
+    )
 
 
 def license_connection():
@@ -2772,6 +2777,15 @@ def _copy_card(name, code, expires_text):
 def admin_dashboard():
     st.markdown('<div class="hero"><h1>AI KHEMRA BRO</h1><p>PRIVATE OWNER MANAGEMENT</p></div>', unsafe_allow_html=True)
     admin_password = get_admin_password()
+
+    if not owner_secrets_configured():
+        st.error("Owner Access is locked until private Streamlit Secrets are configured.")
+        st.caption("Configure ADMIN_USERNAME, ADMIN_PASSWORD, COOKIE_SECRET, and LICENSE_PEPPER in the hosting secrets, then restart the app.")
+        if st.button("← ត្រឡប់ទៅ Customer Login", key="close_unconfigured_admin_gate", use_container_width=True):
+            st.session_state.admin_gate_visible = False
+            st.session_state.owner_click_count = 0
+            st.rerun()
+        return
 
     if not st.session_state.get("admin_authenticated", False):
         left, center, right = st.columns([1, 1.25, 1])
