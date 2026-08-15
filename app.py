@@ -484,6 +484,12 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer textarea::placeholder,.st-key-settings_drawer input::placeholder{color:#abb9cc!important}
 .st-key-settings_drawer hr{border-color:#273650!important}
 .st-key-settings_drawer .stAlert{border-radius:14px!important}
+.settings-save-state{margin:0 0 12px!important;padding:9px 10px!important;border:1px solid rgba(45,212,191,.48)!important;border-radius:12px!important;background:rgba(16,185,129,.13)!important;color:#d1fae5!important;font-size:13px!important;font-weight:800!important;line-height:1.45!important}
+.st-key-settings_drawer [data-testid="stRadio"]{gap:7px!important}
+.st-key-settings_drawer [data-testid="stRadio"] > div{gap:7px!important}
+.st-key-settings_drawer [data-testid="stRadio"] label{box-sizing:border-box!important;width:100%!important;min-height:42px!important;margin:0!important;padding:9px 10px!important;border:1px solid #34445e!important;border-radius:12px!important;background:#162136!important;transition:border-color .16s ease,background .16s ease,transform .16s ease!important}
+.st-key-settings_drawer [data-testid="stRadio"] label:has(input:checked){border-color:#2dd4f1!important;background:#12384b!important;box-shadow:0 0 0 1px rgba(45,212,241,.18),0 6px 15px rgba(6,182,212,.15)!important}
+.st-key-settings_drawer [data-testid="stRadio"] label:active{transform:scale(.985)!important}
 @media(max-width:700px){
   .st-key-settings_drawer{top:68px!important;left:12px!important;width:min(54vw,300px)!important;max-width:calc(100vw - 132px)!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;padding:18px 14px 32px!important;border-radius:20px!important}
   .settings-drawer-title{font-size:22px!important}
@@ -874,7 +880,11 @@ def save_account_settings():
 
 
 def account_settings_changed():
-    save_account_settings()
+    """Persist one tapped setting immediately for the current Access Code."""
+    if save_account_settings():
+        st.session_state["settings_save_feedback"] = True
+    else:
+        st.session_state["settings_save_feedback"] = False
 
 
 def api_keys_changed():
@@ -2988,9 +2998,11 @@ if st.session_state.settings_drawer_open:
         st.divider()
         st.markdown('<h2 class="settings-drawer-title">⚙️ Settings</h2>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="settings-drawer-note">ការកំណត់ត្រូវបានរក្សាទុកម្តងសម្រាប់ Access Code នេះ ហើយអាចប្រើលើទូរសព្ទផ្សេងៗបាន។</p>',
+            '<p class="settings-drawer-note">ចុចជម្រើសដែលអ្នកចង់ប្រើ។ កម្មវិធីរក្សាទុក និងអនុវត្តវាភ្លាមៗសម្រាប់ Access Code នេះ។</p>',
             unsafe_allow_html=True,
         )
+        if st.session_state.pop("settings_save_feedback", None) is True:
+            st.markdown('<p class="settings-save-state">✅ បានរក្សាទុកជម្រើសរបស់អ្នករួចរាល់។ វានឹងប្រើដោយស្វ័យប្រវត្តិពេលបកប្រែ ឬបង្កើតសំឡេង។</p>', unsafe_allow_html=True)
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
         st.caption("សោត្រូវបានអ៊ិនគ្រីប និងចែករំលែកតែជាមួយទូរសព្ទដែលប្រើ Access Code ដូចគ្នា។")
@@ -3014,7 +3026,8 @@ if st.session_state.settings_drawer_open:
             on_change=account_settings_changed,
         )
         st.radio(
-            "Translation Provider", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
+            "🧩 ជ្រើសរើស Translate API", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
+            format_func=lambda value: "🤖 Gemini API" if value == "Gemini" else "🌐 Google API",
             on_change=account_settings_changed,
         )
         if st.session_state.translation_provider == "Google Cloud Translation":
@@ -3024,7 +3037,7 @@ if st.session_state.settings_drawer_open:
                 help="បើក Cloud Translation API និង Billing ក្នុង Google Cloud មុនប្រើសោនេះ។",
             )
         st.radio(
-            "Translation Style", TRANSLATION_STYLE_OPTIONS, key="translation_style",
+            "🎭 ជ្រើសរើសទម្រង់បកប្រែ", TRANSLATION_STYLE_OPTIONS, key="translation_style",
             on_change=account_settings_changed,
             help="ជ្រើសរើសទម្រង់សម្រាប់ការបកប្រែ។ Timestamp និងន័យដើមត្រូវបានរក្សាទុក។",
         )
@@ -3032,7 +3045,8 @@ if st.session_state.settings_drawer_open:
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
         st.radio(
-            "Audio timing", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
+            "🎚️ ជ្រើសរើសការកំណត់សំឡេង", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
+            format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
             on_change=account_settings_changed,
             help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
         )
@@ -3040,7 +3054,8 @@ if st.session_state.settings_drawer_open:
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🗣 Voice Mode</h3>', unsafe_allow_html=True)
         st.radio(
-            "Voice selection", VOICE_MODE_OPTIONS, key="voice_mode",
+            "🗣️ ជ្រើសរើសប្រភេទសំឡេង", VOICE_MODE_OPTIONS, key="voice_mode",
+            format_func=lambda value: {"Auto": "✨ Auto", "All Male": "👨 All Male", "All Female": "👩 All Female"}[value],
             on_change=account_settings_changed,
             help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
         )
