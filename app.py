@@ -690,12 +690,34 @@ def translation_prompt_for_style(style):
 TRANSLATION_PROVIDER_OPTIONS = ["Gemini", "Google Cloud Translation"]
 AUDIO_SYNC_OPTIONS = ["Speed Up Only", "Speed Up & Slow Down"]
 VOICE_MODE_OPTIONS = ["Auto", "All Male", "All Female"]
+
+# Stable text models from the Google AI Studio / Gemini API catalog. These values
+# are exact API endpoint identifiers, stored privately per Access Code.
+GEMINI_TRANSLATION_MODEL_OPTIONS = [
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+]
+DEFAULT_GEMINI_TRANSLATION_MODEL = "gemini-3.6-flash"
+GEMINI_TRANSLATION_MODEL_LABELS = {
+    "gemini-3.6-flash": "⭐ Gemini 3.6 Flash — ណែនាំ: លឿន និងគុណភាពល្អ",
+    "gemini-3.7-flash": "✨ Gemini 3.7 Flash — គុណភាពខ្ពស់",
+    "gemini-3.5-flash": "⚖️ Gemini 3.5 Flash — សមតុល្យ",
+    "gemini-3.5-flash-lite": "⚡ Gemini 3.5 Flash-Lite — លឿន និងសន្សំ",
+    "gemini-3.1-flash-lite": "🚀 Gemini 3.1 Flash-Lite — សន្សំថវិកា",
+    "gemini-2.5-flash": "🔄 Gemini 2.5 Flash — សម្រាប់ API Key ចាស់",
+    "gemini-2.5-pro": "🧠 Gemini 2.5 Pro — គុណភាពខ្ពស់ (យឺត/ថ្លៃជាង)",
+}
 ACCOUNT_SETTINGS_DEFAULTS = {
     "target_language": "Khmer (ខ្មែរ)",
     "translation_style": DEFAULT_TRANSLATION_STYLE,
     "translation_provider": "Gemini",
     "google_translate_api_key": "",
-    "model_selector": "gemini-3.5-flash-lite",
+    "model_selector": DEFAULT_GEMINI_TRANSLATION_MODEL,
     "lite_mode": True,
     "audio_sync_mode": "Speed Up Only",
     "voice_mode": "Auto",
@@ -1497,14 +1519,10 @@ def _candidate_gemini_models(selected_model):
     Stable Gemini 3 models are preferred, followed by the rolling Flash alias
     and finally 2.5 compatibility models for older projects.
     """
-    ordered = [
-        str(selected_model or "").strip(),
-        "gemini-3.5-flash-lite",
-        "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.5-flash-lite",
-        "gemini-2.5-flash",
+    selected = str(selected_model or "").strip()
+    ordered = [selected] + [
+        model_name for model_name in GEMINI_TRANSLATION_MODEL_OPTIONS
+        if model_name != selected
     ]
     result = []
     for name in ordered:
@@ -2960,6 +2978,8 @@ if st.session_state.get("audio_sync_mode") not in AUDIO_SYNC_OPTIONS:
     st.session_state.audio_sync_mode = "Speed Up Only"
 if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
     st.session_state.voice_mode = "Auto"
+if st.session_state.get("model_selector") not in GEMINI_TRANSLATION_MODEL_OPTIONS:
+    st.session_state.model_selector = DEFAULT_GEMINI_TRANSLATION_MODEL
 
 if "settings_drawer_open" not in st.session_state:
     st.session_state.settings_drawer_open = False
@@ -3061,12 +3081,20 @@ if st.session_state.settings_drawer_open:
         )
 
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🧠 AI Model & Network</h3>', unsafe_allow_html=True)
-        st.selectbox(
-            "Gemini Model",
-            ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"],
-            key="model_selector", on_change=account_settings_changed,
-        )
+        st.markdown('<h3 class="settings-drawer-section">🧠 Google AI Studio Model</h3>', unsafe_allow_html=True)
+        if st.session_state.translation_provider == "Gemini":
+            st.caption("ជ្រើសម៉ូដែល Google AI Studio សម្រាប់បកប្រែ។ ចុចម្តងដើម្បីរក្សាទុក និងប្រើពេលបកប្រែបន្ទាប់។")
+            st.radio(
+                "🤖 ជ្រើសរើស Gemini Model",
+                GEMINI_TRANSLATION_MODEL_OPTIONS,
+                key="model_selector",
+                format_func=lambda value: GEMINI_TRANSLATION_MODEL_LABELS[value],
+                on_change=account_settings_changed,
+                help="ម៉ូដែលដែលបានជ្រើសត្រូវបានផ្ញើទៅ Gemini API ជាមុន។ បើ API Key មិនគាំទ្រម៉ូដែលនោះ កម្មវិធីសាកម៉ូដែល Stable ផ្សេងដោយសុវត្ថិភាព។",
+            )
+            st.caption("✅ ប្រើជាមួយ Gemini API Key ដែលបង្កើតពី Google AI Studio។")
+        else:
+            st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
         st.toggle("📶 4G Lite Mode", key="lite_mode", on_change=account_settings_changed)
         st.caption("ការផ្លាស់ប្ដូរជម្រើសខាងលើត្រូវបានរក្សាទុកដោយស្វ័យប្រវត្តិ។")
 
