@@ -2673,7 +2673,8 @@ def normalize_customer_name(value):
 
 
 def normalize_access_code(value):
-    return re.sub(r"[^A-Z0-9-]", "", str(value or "").strip().upper())[:48]
+    """Normalize every Access Code format accepted by the validator."""
+    return re.sub(r"[^A-Z0-9_-]", "", str(value or "").strip().upper())[:48]
 
 
 def _hash_code(code):
@@ -2725,8 +2726,8 @@ def validate_manual_access_code(value):
     code = normalize_access_code(value)
     if not code:
         raise ValueError("សូមបញ្ចូល Access Code ដែលអ្នកចង់កំណត់។")
-    if len(code) < 4 or len(code) > 64:
-        raise ValueError("Access Code ត្រូវមានចន្លោះពី 4 ដល់ 64 តួអក្សរ។")
+    if len(code) < 4 or len(code) > 48:
+        raise ValueError("Access Code ត្រូវមានចន្លោះពី 4 ដល់ 48 តួអក្សរ។")
     if not re.fullmatch(r"[A-Z0-9_-]+", code):
         raise ValueError("Access Code អាចប្រើតែ A-Z, 0-9, សញ្ញា - និង _ ប៉ុណ្ណោះ។")
     return code
