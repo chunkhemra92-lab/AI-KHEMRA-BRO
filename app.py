@@ -3,6 +3,8 @@ import base64
 import datetime
 import hashlib
 import hmac
+import html
+import json
 import re
 import secrets
 import sqlite3
@@ -11,6 +13,9 @@ import subprocess
 import tempfile
 import time
 import uuid
+from urllib import error as urlerror
+from urllib import parse as urlparse
+from urllib import request as urlrequest
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -459,6 +464,51 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   .social-split a{font-size:15px}
 }
 
+/* Scrollable Settings drawer. It is intentionally independent from the project workspace. */
+.settings-drawer-title{margin:0 0 6px!important;color:#ffffff!important;font-size:30px!important;font-weight:950!important}
+.settings-drawer-note{margin:0 0 18px;color:#aab7cb;font-size:14px;line-height:1.55}
+.settings-drawer-section{margin:22px 0 10px!important;color:#ffffff!important;font-size:24px!important;font-weight:900!important}
+.settings-drawer-section + p{color:#b9c5d7!important}
+@media(max-width:700px){
+  div[data-baseweb="popover"]{
+    position:fixed!important;
+    top:0!important;
+    left:0!important;
+    transform:none!important;
+    width:min(82vw,430px)!important;
+    max-width:calc(100vw - 48px)!important;
+    height:100dvh!important;
+    max-height:100dvh!important;
+    margin:0!important;
+    padding:28px 18px 52px!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    background:#111a2c!important;
+    border:0!important;
+    border-right:2px solid #38d9f5!important;
+    border-radius:0 24px 24px 0!important;
+    box-shadow:18px 0 42px rgba(0,0,0,.48)!important;
+    color:#f8fafc!important;
+    scrollbar-width:thin;
+    scrollbar-color:#38d9f5 #111a2c;
+  }
+  div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{width:100%!important;min-width:0!important}
+  div[data-baseweb="popover"] [data-testid="stMarkdownContainer"] p,
+  div[data-baseweb="popover"] label,
+  div[data-baseweb="popover"] label p{color:#f8fafc!important}
+  div[data-baseweb="popover"] [data-baseweb="select"] > div,
+  div[data-baseweb="popover"] input,
+  div[data-baseweb="popover"] textarea{
+    background:#202b3d!important;color:#ffffff!important;border-color:#dbe7f4!important
+  }
+  div[data-baseweb="popover"] textarea::placeholder,
+  div[data-baseweb="popover"] input::placeholder{color:#abb9cc!important}
+  div[data-baseweb="popover"] hr{border-color:#273650!important}
+  div[data-baseweb="popover"] .stAlert{border-radius:14px!important}
+  .st-key-api_menu_container{top:12px!important;left:12px!important}
+  .st-key-api_menu_container button{width:48px!important;height:46px!important;min-height:46px!important;border-radius:14px!important}
+}
+
 </style>
 ''', unsafe_allow_html=True)
 
@@ -647,6 +697,21 @@ def translation_prompt_for_style(style):
     )
 
 
+TRANSLATION_PROVIDER_OPTIONS = ["Gemini", "Google Cloud Translation"]
+AUDIO_SYNC_OPTIONS = ["Speed Up Only", "Speed Up & Slow Down"]
+VOICE_MODE_OPTIONS = ["Auto", "All Male", "All Female"]
+ACCOUNT_SETTINGS_DEFAULTS = {
+    "target_language": "Khmer (ខ្មែរ)",
+    "translation_style": DEFAULT_TRANSLATION_STYLE,
+    "translation_provider": "Gemini",
+    "google_translate_api_key": "",
+    "model_selector": "gemini-3.5-flash-lite",
+    "lite_mode": True,
+    "audio_sync_mode": "Speed Up Only",
+    "voice_mode": "Auto",
+}
+
+
 API_COOKIE_NAME = "ai_khemra_bro_private_api"
 COOKIE_SECRET_CONFIGURED = False
 
@@ -779,6 +844,56 @@ def delete_private_api_keys():
         cookie_manager.delete(API_COOKIE_NAME, key="delete_private_api_cookie_explicit")
     except Exception:
         pass
+
+def _load_account_settings():
+    """Load encrypted settings that belong only to the signed-in Access Code."""
+    code = _current_customer_code()
+    if not code:
+        return {}
+    try:
+        with license_connection() as connection:
+            row = connection.execute(
+                "SELECT saved_settings_encrypted FROM licenses "
+                "WHERE access_code_hash=? OR access_code_display=?",
+                (_hash_code(code), code),
+            ).fetchone()
+        if not row or not row["saved_settings_encrypted"]:
+            return {}
+        payload = decrypt_api_keys(row["saved_settings_encrypted"])
+        parsed = json.loads(payload) if payload else {}
+        return parsed if isinstance(parsed, dict) else {}
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return {}
+    except Exception:
+        return {}
+
+
+def save_account_settings():
+    """Save user choices once so the same Access Code uses them on every phone."""
+    code = _current_customer_code()
+    if not code:
+        return False
+    payload = {
+        key: st.session_state.get(key, default)
+        for key, default in ACCOUNT_SETTINGS_DEFAULTS.items()
+    }
+    encrypted = encrypt_api_keys(json.dumps(payload, ensure_ascii=False))
+    try:
+        with license_connection() as connection:
+            connection.execute(
+                "UPDATE licenses SET saved_settings_encrypted=? "
+                "WHERE access_code_hash=? OR access_code_display=?",
+                (encrypted, _hash_code(code), code),
+            )
+            connection.commit()
+        return True
+    except Exception:
+        return False
+
+
+def account_settings_changed():
+    save_account_settings()
+
 
 def api_keys_changed():
     save_private_api_keys(st.session_state.get("api_keys_manager", ""))
@@ -1499,8 +1614,57 @@ def translate_cues_text_only(
     return translated
 
 
+def google_translate_texts(texts, google_api_key):
+    """Translate a batch through the customer's Google Cloud Translation key."""
+    if not google_api_key:
+        raise ValueError("សូមបញ្ចូល Google Cloud Translation API Key ក្នុង Settings។")
+    payload = json.dumps({"q": texts, "target": "km", "format": "text"}).encode("utf-8")
+    endpoint = "https://translation.googleapis.com/language/translate/v2?key=" + urlparse.quote(google_api_key, safe="")
+    request = urlrequest.Request(
+        endpoint,
+        data=payload,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST",
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=40) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urlerror.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")[-500:]
+        raise RuntimeError(f"Google Cloud Translation មិនអាចប្រើបាន៖ {detail or exc.reason}") from exc
+    except urlerror.URLError as exc:
+        raise RuntimeError(f"មិនអាចភ្ជាប់ Google Cloud Translation បាន៖ {exc.reason}") from exc
+    rows = body.get("data", {}).get("translations", [])
+    if len(rows) != len(texts):
+        raise RuntimeError("Google Cloud Translation មិនបានត្រឡប់លទ្ធផលគ្រប់បន្ទាត់។")
+    return [html.unescape(str(row.get("translatedText", "")).strip()) for row in rows]
+
+
+def translate_cues_with_google(cues, google_api_key):
+    """Preserve SRT timing and tags while using Google Cloud Translation for text."""
+    translated = {}
+    for offset in range(0, len(cues), 40):
+        batch = cues[offset:offset + 40]
+        sources = [str(cue.get("source", cue.get("text", ""))).strip() for cue in batch]
+        outputs = google_translate_texts(sources, google_api_key)
+        for cue, text in zip(batch, outputs):
+            if not text:
+                raise RuntimeError(f"Google មិនបានបកប្រែបន្ទាត់ {cue['id']}")
+            translated[cue["id"]] = {
+                "tag": str(cue.get("tag", "M_ADULT")).upper(),
+                "text": text,
+            }
+    return translated
+
+
 def video_to_srt(
-    video_path, api_keys, model, prepared_cues=None, translation_style=DEFAULT_TRANSLATION_STYLE
+    video_path,
+    api_keys,
+    model,
+    prepared_cues=None,
+    translation_style=DEFAULT_TRANSLATION_STYLE,
+    translation_provider="Gemini",
+    google_api_key="",
 ):
     """
     Reliable v5.5 path:
@@ -1510,8 +1674,6 @@ def video_to_srt(
     if isinstance(api_keys, str):
         api_keys = [api_keys]
     api_keys = [str(key).strip() for key in api_keys if str(key).strip()]
-    if not api_keys:
-        raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
 
     if prepared_cues is None:
         with tempfile.TemporaryDirectory() as folder:
@@ -1522,6 +1684,16 @@ def video_to_srt(
         cues = prepared_cues
     if not cues:
         raise RuntimeError("Whisper មិនរកឃើញសំឡេងនិយាយក្នុងវីដេអូនេះទេ។")
+
+    if translation_provider == "Google Cloud Translation":
+        translated = translate_cues_with_google(cues, google_api_key)
+        result = build_srt(cues, translated)
+        if not result.strip() or "-->" not in result:
+            raise RuntimeError("Google មិនអាចបង្កើត Khmer SRT បានទេ។")
+        return result
+
+    if not api_keys:
+        raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
 
     last_error = None
     for api_key_value in api_keys:
@@ -1709,18 +1881,31 @@ def probe_audio_duration(path):
 
 
 def atempo_chain(speed):
-    """Build a valid FFmpeg atempo chain for speed factors above 1."""
+    """Build a valid FFmpeg atempo chain for tempo factors from 0.5x to 4x."""
     factors = []
-    remaining = max(1.0, float(speed))
+    remaining = min(4.0, max(0.5, float(speed)))
     while remaining > 2.0:
         factors.append(2.0)
         remaining /= 2.0
-    if remaining > 1.001:
+    while remaining < 0.5:
+        factors.append(0.5)
+        remaining /= 0.5
+    if abs(remaining - 1.0) > 0.001:
         factors.append(remaining)
     return ",".join(f"atempo={value:.5f}" for value in factors)
 
 
-def create_mp3(srt_text, progress_callback=None):
+def effective_voice_tag(tag, voice_mode):
+    if voice_mode == "All Male":
+        return "M_ADULT"
+    if voice_mode == "All Female":
+        return "F_ADULT"
+    return tag if tag in VOICE_PROFILES else "M_ADULT"
+
+
+def create_mp3(
+    srt_text, progress_callback=None, audio_sync_mode="Speed Up Only", voice_mode="Auto"
+):
     """
     Create one synchronized Khmer MP3.
 
@@ -1753,7 +1938,8 @@ def create_mp3(srt_text, progress_callback=None):
 
         for index, cue in enumerate(cues):
             clip = root / f'clip_{index:04d}.mp3'
-            profile = VOICE_PROFILES.get(cue['tag'], VOICE_PROFILES['M_ADULT'])
+            cue['effective_tag'] = effective_voice_tag(cue.get('tag', 'M_ADULT'), voice_mode)
+            profile = VOICE_PROFILES.get(cue['effective_tag'], VOICE_PROFILES['M_ADULT'])
             run_async(synthesize(cue['text'], profile, clip))
             clips.append(clip)
             clip_durations.append(probe_audio_duration(clip))
@@ -1791,11 +1977,14 @@ def create_mp3(srt_text, progress_callback=None):
             slot_seconds = max(0.18, (protected_end_ms - start_ms) / 1000.0)
             audio_seconds = clip_durations[index]
 
-            # Fit the spoken line to its real available slot. We allow a moderate
-            # speed increase, then hard-trim only as the final overlap safeguard.
+            # Fit speech inside its slot. The optional slow-down mode uses spare
+            # time for clearer delivery while retaining the no-overlap safeguard.
             required_speed = audio_seconds / slot_seconds
-            safe_speed = min(max(1.0, required_speed), MAX_TEMPO_SPEED)
-            tempo = atempo_chain(safe_speed) if safe_speed > 1.001 else ''
+            if audio_sync_mode == "Speed Up & Slow Down":
+                safe_speed = min(max(0.75, required_speed), MAX_TEMPO_SPEED)
+            else:
+                safe_speed = min(max(1.0, required_speed), MAX_TEMPO_SPEED)
+            tempo = atempo_chain(safe_speed) if abs(safe_speed - 1.0) > 0.001 else ''
             rendered_seconds = audio_seconds / safe_speed
             trim_seconds = min(rendered_seconds, slot_seconds)
 
@@ -1822,7 +2011,7 @@ def create_mp3(srt_text, progress_callback=None):
                 'equalizer=f=4300:t=q:w=1.0:g=-1.8',
                 'equalizer=f=5800:t=q:w=0.9:g=-3.2',
                 'equalizer=f=7000:t=q:w=0.8:g=-3.8',
-                *character_voice_filters(cue.get('tag', 'M_ADULT')),
+                *character_voice_filters(cue.get('effective_tag', cue.get('tag', 'M_ADULT'))),
                 'acompressor=threshold=-23dB:ratio=2.0:attack=14:release=190:makeup=1.15:knee=4',
                 f'atrim=0:{trim_seconds:.3f}',
                 'asetpts=PTS-STARTPTS',
@@ -1967,6 +2156,7 @@ def initialize_license_database():
         _ensure_column(connection, "licenses", "active_session_last_seen", "TEXT")
         _ensure_column(connection, "licenses", "created_card_until", "TEXT")
         _ensure_column(connection, "licenses", "saved_api_keys_encrypted", "TEXT")
+        _ensure_column(connection, "licenses", "saved_settings_encrypted", "TEXT")
         _ensure_column(connection, "licenses", "plan_label", "TEXT")
         old_columns = {row["name"] for row in connection.execute("PRAGMA table_info(licenses)")}
         if "access_code" in old_columns:
@@ -2742,116 +2932,134 @@ st.caption(f"👤 {login_row['customer_name']}")
 if "api_keys_manager" not in st.session_state:
     st.session_state.api_keys_manager = load_private_api_keys()
 
-# Defaults are per user/session; no user's working data is shared with another.
-for state_key, default_value in {
-    "target_language": "Khmer (ខ្មែរ)",
-    "translation_style": DEFAULT_TRANSLATION_STYLE,
-    "model_selector": "gemini-3.5-flash-lite",
-    "lite_mode": True,
-    "api_saved_notice": False,
-}.items():
+# Saved settings belong to the Access Code, so the same customer sees the same
+# choices on every phone without affecting other customer accounts.
+settings_owner_code = _current_customer_code()
+if st.session_state.get("settings_owner_code") != settings_owner_code:
+    saved_settings = _load_account_settings()
+    for state_key, default_value in ACCOUNT_SETTINGS_DEFAULTS.items():
+        st.session_state[state_key] = saved_settings.get(state_key, default_value)
+    st.session_state.settings_owner_code = settings_owner_code
+
+for state_key, default_value in ACCOUNT_SETTINGS_DEFAULTS.items():
     if state_key not in st.session_state:
         st.session_state[state_key] = default_value
-
-# Replace the previous style values with the supported choices for existing sessions.
 if st.session_state.get("translation_style") not in TRANSLATION_STYLE_OPTIONS:
     st.session_state.translation_style = DEFAULT_TRANSLATION_STYLE
+if st.session_state.get("translation_provider") not in TRANSLATION_PROVIDER_OPTIONS:
+    st.session_state.translation_provider = "Gemini"
+if st.session_state.get("audio_sync_mode") not in AUDIO_SYNC_OPTIONS:
+    st.session_state.audio_sync_mode = "Speed Up Only"
+if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
+    st.session_state.voice_mode = "Auto"
 
 with st.container(key="api_menu_container"):
-    with st.popover("☰", help="API Key និងការកំណត់កម្មវិធី"):
-        st.markdown("### ⚙️ ការកំណត់")
+    with st.popover("☰", help="Settings"):
+        st.markdown('<h2 class="settings-drawer-title">⚙️ Settings</h2>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="settings-drawer-note">ការកំណត់ត្រូវបានរក្សាទុកម្តងសម្រាប់ Access Code នេះ ហើយអាចប្រើលើទូរសព្ទផ្សេងៗបាន។</p>',
+            unsafe_allow_html=True,
+        )
 
-        # Private subscription status for the current authenticated customer.
         private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
         private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
         private_now = _utcnow()
         private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
-
-        st.markdown("#### 📅 កញ្ចប់របស់អ្នក")
+        st.markdown('<h3 class="settings-drawer-section">👤 Account & Plan</h3>', unsafe_allow_html=True)
         render_private_subscription_countdown(private_expiry, private_plan)
         if not private_active:
             st.error("❌ កញ្ចប់បានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិ។")
-
-        st.divider()
-        st.selectbox("🌍 Target Language", ["Khmer (ខ្មែរ)"], key="target_language")
-        st.radio(
-            "🎭 Translation Style",
-            TRANSLATION_STYLE_OPTIONS,
-            key="translation_style",
-            help="ជ្រើសរើសទម្រង់សម្រាប់ការបកប្រែ។ ជម្រើសនេះប៉ះពាល់តែសម្លេង និងរបៀបសរសេរ មិនប្ដូរ timestamp ឬន័យដើមទេ។",
-        )
-        st.selectbox(
-            "🤖 Gemini Model",
-            [
-                "gemini-3.5-flash-lite",
-                "gemini-3.6-flash",
-                "gemini-3.5-flash",
-                "gemini-flash-latest",
-            ],
-            key="model_selector",
-            help="App នឹងសាកម៉ូឌែលបម្រុងដោយស្វ័យប្រវត្តិ ប្រសិនបើម៉ូឌែលមួយ 404 ឬមិនអាចប្រើបាន។",
-        )
-        st.toggle("📶 4G Lite Mode", key="lite_mode")
-
-        # API management stays at the bottom of Settings so it never occupies
-        # the main translation workspace.
-        st.divider()
-        st.markdown("#### 🔑 Gemini API Key")
-        st.caption(
-            "API Key ត្រូវបានអ៊ិនគ្រីប និងរក្សាទុកជាមួយគណនីអ្នក។ "
-            "អាចដាក់ច្រើនសោ ដោយមួយបន្ទាត់មួយសោ។"
-        )
-        st.text_area(
-            "Gemini API Key",
-            height=76,
-            placeholder="AIza...",
-            key="api_keys_manager",
-            label_visibility="collapsed",
-            help="បើសោមួយ quota ពេញ App នឹងសាកសោបន្ទាប់។",
-        )
-
-        if st.button("💾 រក្សាទុក API Key", key="save_api_keys", use_container_width=True):
-            entered_keys = [
-                line.strip()
-                for line in st.session_state.api_keys_manager.splitlines()
-                if line.strip()
-            ]
-            if entered_keys:
-                save_private_api_keys(st.session_state.api_keys_manager)
-                st.session_state.api_saved_notice = True
-                st.rerun()
-            else:
-                st.warning("សូមបញ្ចូល API Key ជាមុន។")
-
-        current_keys = [
-            line.strip()
-            for line in st.session_state.get("api_keys_manager", "").splitlines()
-            if line.strip()
-        ]
-        if current_keys:
-            st.success(f"✅ API Key ត្រៀមប្រើ៖ {len(current_keys)}")
-        else:
-            st.caption("មិនទាន់មាន API Key។ អ្នកនៅតែអាចបើកមើលកម្មវិធីបាន។")
-
-        st.divider()
-        if st.button("ចាកចេញ", key="customer_logout", use_container_width=True):
+        if st.button("🚪 Logout", key="customer_logout", use_container_width=True):
             release_customer_session(st.session_state.get("customer_code", ""), current_token)
             _session_cookie_delete()
             clear_private_user_session()
-            for key in ("customer_authenticated", "customer_name", "customer_code", "customer_session_token"):
+            for key in (
+                "customer_authenticated", "customer_name", "customer_code",
+                "customer_session_token", "settings_owner_code",
+            ):
                 st.session_state.pop(key, None)
             st.rerun()
+
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
+        st.caption("សោត្រូវបានអ៊ិនគ្រីប និងចែករំលែកតែជាមួយទូរសព្ទដែលប្រើ Access Code ដូចគ្នា។")
+        st.text_area(
+            "Gemini API Keys", height=92, placeholder="AIza... (one key per line)",
+            key="api_keys_manager", label_visibility="collapsed",
+            help="បើសោមួយ quota ពេញ App នឹងសាកសោបន្ទាប់។",
+        )
+        if st.button("💾 Save Gemini Keys", key="save_api_keys", use_container_width=True):
+            entered_keys = [line.strip() for line in st.session_state.api_keys_manager.splitlines() if line.strip()]
+            if entered_keys:
+                save_private_api_keys(st.session_state.api_keys_manager)
+                st.success("✅ បានរក្សាទុក Gemini API Key សម្រាប់ Access Code នេះ។")
+            else:
+                st.warning("សូមបញ្ចូល Gemini API Key ជាមុន។")
+
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">🎭 Translation</h3>', unsafe_allow_html=True)
+        st.selectbox(
+            "🌍 Target Language", ["Khmer (ខ្មែរ)"], key="target_language",
+            on_change=account_settings_changed,
+        )
+        st.radio(
+            "Translation Provider", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
+            on_change=account_settings_changed,
+        )
+        if st.session_state.translation_provider == "Google Cloud Translation":
+            st.text_input(
+                "Google Cloud Translation API Key", type="password", placeholder="AIza...",
+                key="google_translate_api_key", on_change=account_settings_changed,
+                help="បើក Cloud Translation API និង Billing ក្នុង Google Cloud មុនប្រើសោនេះ។",
+            )
+        st.radio(
+            "Translation Style", TRANSLATION_STYLE_OPTIONS, key="translation_style",
+            on_change=account_settings_changed,
+            help="ជ្រើសរើសទម្រង់សម្រាប់ការបកប្រែ។ Timestamp និងន័យដើមត្រូវបានរក្សាទុក។",
+        )
+
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
+        st.radio(
+            "Audio timing", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
+            on_change=account_settings_changed,
+            help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
+        )
+
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">🗣 Voice Mode</h3>', unsafe_allow_html=True)
+        st.radio(
+            "Voice selection", VOICE_MODE_OPTIONS, key="voice_mode",
+            on_change=account_settings_changed,
+            help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
+        )
+
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">🧠 AI Model & Network</h3>', unsafe_allow_html=True)
+        st.selectbox(
+            "Gemini Model",
+            ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"],
+            key="model_selector", on_change=account_settings_changed,
+        )
+        st.toggle("📶 4G Lite Mode", key="lite_mode", on_change=account_settings_changed)
+        st.caption("ការផ្លាស់ប្ដូរជម្រើសខាងលើត្រូវបានរក្សាទុកដោយស្វ័យប្រវត្តិ។")
 
 api_keys_text = st.session_state.get("api_keys_manager", "")
 valid_api_keys = [line.strip() for line in api_keys_text.splitlines() if line.strip()]
 api_key = valid_api_keys[0] if valid_api_keys else ""
 translation_style = st.session_state.translation_style
+translation_provider = st.session_state.translation_provider
+google_translate_api_key = st.session_state.get("google_translate_api_key", "").strip()
+audio_sync_mode = st.session_state.audio_sync_mode
+voice_mode = st.session_state.voice_mode
 model = st.session_state.model_selector
 lite_mode = st.session_state.lite_mode
 max_mb = 60 if lite_mode else 150
+provider_ready = bool(google_translate_api_key) if translation_provider == "Google Cloud Translation" else bool(valid_api_keys)
 
-if not valid_api_keys:
-    st.warning("🔐 មិនទាន់មាន Gemini API Key — សូមបញ្ចូលក្នុង ☰ Settings ដើម្បីបកប្រែអក្សរទៅជាភាសាខ្មែរ។")
+if not provider_ready:
+    provider_name = "Google Cloud Translation API Key" if translation_provider == "Google Cloud Translation" else "Gemini API Key"
+    st.warning(f"🔐 មិនទាន់មាន {provider_name} — សូមបញ្ចូលក្នុង ☰ Settings ដើម្បីបកប្រែអក្សរទៅជាភាសាខ្មែរ។")
 
 st.markdown(
     '<div class="hero"><h1>AI KHEMRA BRO</h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
@@ -2913,7 +3121,7 @@ with tab_video:
 
                     st.session_state.source_srt_text = source_srt
 
-                    if valid_api_keys:
+                    if provider_ready:
                         progress_bar.progress(62)
                         progress_text.markdown("### ⏱️ 62%<br>🌐 កំពុងបកប្រែទៅភាសាខ្មែរ…", unsafe_allow_html=True)
                         try:
@@ -2925,6 +3133,8 @@ with tab_video:
                                     model,
                                     cues,
                                     translation_style,
+                                    translation_provider,
+                                    google_translate_api_key,
                                 )
                                 while not future.done():
                                     elapsed = time.time() - started_at
@@ -2939,12 +3149,12 @@ with tab_video:
                             # Never discard Whisper output when Gemini quota/key fails.
                             generated_srt = source_srt
                             notice = (
-                                "⚠️ Whisper បានបង្កើត Source SRT រួច ប៉ុន្តែ Gemini មិនអាចបកប្រែបាន។ "
+                                "⚠️ Whisper បានបង្កើត Source SRT រួច ប៉ុន្តែអ្នកផ្ដល់សេវាបកប្រែមិនអាចប្រើបាន។ "
                                 + friendly_ai_error(translation_exc, len(valid_api_keys))
                             )
                     else:
                         generated_srt = source_srt
-                        notice = "⚠️ បានបង្កើត Source SRT រួច។ ដាក់ Gemini API Key ក្នុង Settings ដើម្បីបកប្រែទៅខ្មែរ។"
+                        notice = "⚠️ បានបង្កើត Source SRT រួច។ ដាក់ API Key សម្រាប់អ្នកផ្ដល់សេវាដែលបានជ្រើសក្នុង Settings ដើម្បីបកប្រែទៅខ្មែរ។"
 
                     st.session_state.srt_text = generated_srt
                     st.session_state.main_srt_editor = generated_srt
@@ -3074,6 +3284,8 @@ with tab_video:
                     st.session_state.audio_bytes = create_mp3(
                         st.session_state.srt_text,
                         progress_callback=update_audio_progress,
+                        audio_sync_mode=audio_sync_mode,
+                        voice_mode=voice_mode,
                     )
                     # Clear the processing display immediately after completion.
                     progress_bar.empty()
@@ -3144,29 +3356,32 @@ with tab_translate:
     if st.button("🌐 Translate to Khmer", key="translate_btn"):
         if not source_srt.strip():
             st.warning("សូមបញ្ចូល Chinese SRT។")
-        elif not api_key:
-            st.error("សូមចុចប៊ូតុង ☰ បញ្ចូល API Key ហើយចុច «រក្សាទុក»។")
+        elif not provider_ready:
+            st.error("សូមបញ្ចូល API Key សម្រាប់អ្នកផ្ដល់សេវាដែលបានជ្រើសក្នុង ☰ Settings។")
         else:
             try:
                 source_cues = srt_to_structured_cues(source_srt)
                 if not source_cues:
                     raise ValueError("Chinese SRT មិនត្រឹមត្រូវ។")
-                client = genai.Client(api_key=api_key)
-                translated_map = {}
-                for offset in range(0, len(source_cues), 35):
-                    batch = source_cues[offset:offset + 35]
-                    payload = "\n".join(
-                        f'ID={cue["id"]} | SOURCE={cue["text"]}' for cue in batch
-                    )
-                    response = gemini_generate_with_retry(
-                        client, model, translation_prompt_for_style(translation_style) + "\n\nCUES:\n" + payload
-                    )
-                    for item in parse_json_array(response.text or ""):
-                        cue_id = int(item.get("id"))
-                        tag = str(item.get("tag", "M")).upper()
-                        if tag not in VOICE_PROFILES:
-                            tag = "M_ADULT"
-                        translated_map[cue_id] = {"tag": tag, "text": str(item.get("text", "")).strip()}
+                if translation_provider == "Google Cloud Translation":
+                    translated_map = translate_cues_with_google(source_cues, google_translate_api_key)
+                else:
+                    client = genai.Client(api_key=api_key)
+                    translated_map = {}
+                    for offset in range(0, len(source_cues), 35):
+                        batch = source_cues[offset:offset + 35]
+                        payload = "\n".join(
+                            f'ID={cue["id"]} | SOURCE={cue["text"]}' for cue in batch
+                        )
+                        response = gemini_generate_with_retry(
+                            client, model, translation_prompt_for_style(translation_style) + "\n\nCUES:\n" + payload
+                        )
+                        for item in parse_json_array(response.text or ""):
+                            cue_id = int(item.get("id"))
+                            tag = str(item.get("tag", "M")).upper()
+                            if tag not in VOICE_PROFILES:
+                                tag = "M_ADULT"
+                            translated_map[cue_id] = {"tag": tag, "text": str(item.get("text", "")).strip()}
                 blocks = []
                 for cue in source_cues:
                     item = translated_map.get(cue["id"])
@@ -3195,7 +3410,11 @@ with tab_srt_speech:
         else:
             try:
                 with st.spinner("កំពុងបង្កើតសំឡេង…"):
-                    st.session_state.speech_tab_audio_bytes = create_mp3(speech_srt)
+                    st.session_state.speech_tab_audio_bytes = create_mp3(
+                        speech_srt,
+                        audio_sync_mode=audio_sync_mode,
+                        voice_mode=voice_mode,
+                    )
                 st.success("✅ បង្កើត MP3 រួចរាល់។")
             except Exception as exc:
                 st.error(f"❌ {exc}")
