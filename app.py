@@ -741,6 +741,7 @@ TRANSLATION_PROVIDER_OPTIONS = ["Gemini", "Google Cloud Translation"]
 AUDIO_SYNC_OPTIONS = ["Speed Up Only", "Speed Up & Slow Down"]
 VOICE_MODE_OPTIONS = ["Auto", "All Male", "All Female"]
 SRT_INPUT_HEIGHT = 300
+MAX_VIDEO_DURATION_SECONDS = 15 * 60
 
 # Stable text models from the Google AI Studio / Gemini API catalog. These values
 # are exact API endpoint identifiers, stored privately per Access Code.
@@ -781,17 +782,29 @@ LEGACY_API_COOKIE_NAME = "ai_khemra_bro_private_api"
 API_BROWSER_CACHE_NAME = "ai_khemra_bro_private_api_v2"
 API_BROWSER_CACHE_TTL_DAYS = 30
 COOKIE_SECRET_CONFIGURED = False
+API_VAULT_SECRET_CONFIGURED = False
 
 try:
     raw_cookie_secret = str(st.secrets.get("COOKIE_SECRET", "")).strip()
 except Exception:
     raw_cookie_secret = ""
+try:
+    raw_license_pepper_for_vault = str(st.secrets.get("LICENSE_PEPPER", "")).strip()
+except Exception:
+    raw_license_pepper_for_vault = ""
 
 if raw_cookie_secret:
     COOKIE_SECRET_CONFIGURED = True
+    API_VAULT_SECRET_CONFIGURED = True
+elif raw_license_pepper_for_vault:
+    # A configured LICENSE_PEPPER is also a private hosting secret. Domain-separate
+    # it before deriving the vault cipher so keys still survive an app restart if
+    # an older deployment omitted COOKIE_SECRET.
+    raw_cookie_secret = "api-vault-v1:" + raw_license_pepper_for_vault
+    API_VAULT_SECRET_CONFIGURED = True
 else:
-    # Never keep a reusable encryption secret in the public repository.
-    # Private Streamlit Secrets must provide COOKIE_SECRET for durable account data.
+    # Never keep a reusable encryption secret in the public repository. Without a
+    # private hosting secret, only this running process can decrypt vault records.
     raw_cookie_secret = secrets.token_urlsafe(48)
 
 fernet_key = base64.urlsafe_b64encode(hashlib.sha256(raw_cookie_secret.encode("utf-8")).digest())
@@ -1277,6 +1290,27 @@ def save_upload(uploaded_file):
         temp.flush()
     return destination
 
+def probe_media_duration(path):
+    """Read media duration without decoding the full video."""
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[-500:] or "មិនអាចអានរយៈពេលវីដេអូបានទេ។")
+    duration = float(result.stdout.strip())
+    if duration <= 0:
+        raise RuntimeError("រយៈពេលវីដេអូមិនត្រឹមត្រូវ។")
+    return duration
+
+
 def seconds_to_srt(value):
     total_ms = max(0, int(round(float(value) * 1000)))
     hours, rem = divmod(total_ms, 3_600_000)
@@ -1308,14 +1342,12 @@ def optimize_video_for_processing(source_path, output_path):
 
 
 def extract_audio(video_path, audio_path):
-    """Prepare speech for ASR while preserving both near and distant voices."""
-    # Dynamic normalization raises quiet/distant dialogue without crushing nearby
-    # speakers. Gentle denoise removes steady background hiss while retaining speech.
+    """Prepare a fast 16 kHz speech track for Whisper transcription."""
+    # Keep the essential speech cleanup but avoid costly denoise, normalization,
+    # and FLAC compression on Community Cloud CPU.
     audio_filter = (
         "highpass=f=70,lowpass=f=7800,"
-        "afftdn=nf=-28:tn=1,"
-        "dynaudnorm=f=250:g=9:p=0.95:m=12,"
-        "acompressor=threshold=-30dB:ratio=2.2:attack=12:release=180:makeup=1.35,"
+        "acompressor=threshold=-30dB:ratio=2.0:attack=12:release=180:makeup=1.25,"
         "alimiter=limit=0.97"
     )
     result = subprocess.run(
@@ -1323,7 +1355,7 @@ def extract_audio(video_path, audio_path):
             "ffmpeg", "-y", "-i", str(video_path),
             "-vn", "-ac", "1", "-ar", "16000",
             "-af", audio_filter,
-            "-c:a", "flac", "-compression_level", "8", str(audio_path),
+            "-c:a", "pcm_s16le", str(audio_path),
         ],
         capture_output=True,
         text=True,
@@ -1395,8 +1427,8 @@ def transcribe_with_whisper(wav_path):
     segments, _ = model.transcribe(
         str(wav_path),
         language="zh",
-        beam_size=10,
-        best_of=5,
+        beam_size=5,
+        best_of=3,
         vad_filter=True,
         vad_parameters={
             "min_silence_duration_ms": 220,
@@ -1771,7 +1803,7 @@ def build_source_srt(cues):
 def transcribe_video_to_source_srt(video_path):
     """FFmpeg + Whisper only. No Gemini key is required."""
     with tempfile.TemporaryDirectory() as folder:
-        audio_path = Path(folder) / "audio_16k.flac"
+        audio_path = Path(folder) / "audio_16k.wav"
         extract_audio(Path(video_path), audio_path)
         cues = transcribe_with_whisper(audio_path)
         source_srt = build_source_srt(cues)
@@ -1878,33 +1910,53 @@ CUES:
 
 
 def translate_cues_text_only(
-    client, model_name, cues, translation_style=DEFAULT_TRANSLATION_STYLE
+    api_keys, model_name, cues, translation_style=DEFAULT_TRANSLATION_STYLE
 ):
-    """Low-request translation path designed for free-tier Gemini keys."""
+    """Translate in large ordered batches, rotating through every saved Gemini key."""
+    if isinstance(api_keys, str):
+        api_keys = [api_keys]
+    keys = _normalized_api_keys("\n".join(str(key or "") for key in api_keys))
+    if not keys:
+        raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
+
     translated = {}
-    # Larger batches reduce request count and 429 failures.
-    batch_size = 45
-    for offset in range(0, len(cues), batch_size):
+    # Fewer requests reduce latency while sequential batches preserve dialogue context.
+    batch_size = 60
+    for batch_number, offset in enumerate(range(0, len(cues), batch_size)):
         batch = cues[offset:offset + batch_size]
         context_rows = []
-        for cue in cues[max(0, offset - 5):offset]:
+        for cue in cues[max(0, offset - 6):offset]:
             item = translated.get(cue["id"])
             if item:
                 context_rows.append(
                     f'ID={cue["id"]} TAG={item["tag"]} SOURCE={cue["source"]} KHMER={item["text"]}'
                 )
-        parsed = _translate_batch_text_only(
-            client, model_name, batch, "\n".join(context_rows), translation_style
-        )
+
+        def request_with_rotating_keys(request_batch, context="", start_at=None):
+            last_error = None
+            start_index = batch_number % len(keys) if start_at is None else start_at % len(keys)
+            for key_offset in range(len(keys)):
+                api_key_value = keys[(start_index + key_offset) % len(keys)]
+                try:
+                    client = genai.Client(api_key=api_key_value)
+                    return _translate_batch_text_only(
+                        client, model_name, request_batch, context, translation_style
+                    )
+                except Exception as exc:
+                    last_error = exc
+                    if not (is_quota_error(exc) or is_invalid_key_error(exc)):
+                        raise
+            raise RuntimeError(friendly_ai_error(last_error, len(keys)))
+
+        parsed = request_with_rotating_keys(batch, "\n".join(context_rows))
         translated.update(parsed)
 
         missing = [cue for cue in batch if cue["id"] not in translated]
         if missing:
-            # One compact repair request, only for missing lines.
-            repaired = _translate_batch_text_only(
-                client, model_name, missing, translation_style=translation_style
+            # Repair only missing lines, beginning with the next key in rotation.
+            translated.update(
+                request_with_rotating_keys(missing, start_at=batch_number + 1)
             )
-            translated.update(repaired)
 
         still_missing = [cue["id"] for cue in batch if cue["id"] not in translated]
         if still_missing:
@@ -1978,7 +2030,7 @@ def video_to_srt(
 
     if prepared_cues is None:
         with tempfile.TemporaryDirectory() as folder:
-            audio_path = Path(folder) / "audio_16k.flac"
+            audio_path = Path(folder) / "audio_16k.wav"
             extract_audio(Path(video_path), audio_path)
             cues = transcribe_with_whisper(audio_path)
     else:
@@ -1997,31 +2049,30 @@ def video_to_srt(
         raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
 
     last_error = None
-    for api_key_value in api_keys:
-        client = genai.Client(api_key=api_key_value)
-        for model_name in _candidate_gemini_models(model):
-            try:
-                translated = translate_cues_text_only(
-                    client, model_name, cues, translation_style
-                )
-                result = build_srt(cues, translated)
-                if not result.strip() or "-->" not in result:
-                    raise RuntimeError("មិនអាចបង្កើត Khmer SRT បានទេ។")
-                return result
-            except Exception as exc:
-                last_error = exc
-                message = str(exc).upper()
-                # Try the next model for quota/model availability problems.
-                if (
-                    is_quota_error(exc)
-                    or is_invalid_key_error(exc)
-                    or "NOT_FOUND" in message
-                    or "MODEL" in message and "NOT" in message
-                    or "UNAVAILABLE" in message
-                    or "503" in message
-                ):
-                    continue
-                raise RuntimeError(friendly_ai_error(exc, len(api_keys))) from exc
+    for model_name in _candidate_gemini_models(model):
+        try:
+            translated = translate_cues_text_only(
+                api_keys, model_name, cues, translation_style
+            )
+            result = build_srt(cues, translated)
+            if not result.strip() or "-->" not in result:
+                raise RuntimeError("មិនអាចបង្កើត Khmer SRT បានទេ។")
+            return result
+        except Exception as exc:
+            last_error = exc
+            message = str(exc).upper()
+            # Try the next configured model for availability errors. Each batch
+            # already rotates across every saved customer key before reaching here.
+            if (
+                is_quota_error(exc)
+                or is_invalid_key_error(exc)
+                or "NOT_FOUND" in message
+                or "MODEL" in message and "NOT" in message
+                or "UNAVAILABLE" in message
+                or "503" in message
+            ):
+                continue
+            raise RuntimeError(friendly_ai_error(exc, len(api_keys))) from exc
 
     raise RuntimeError(friendly_ai_error(last_error, len(api_keys)))
 def srt_to_structured_cues(srt_text):
@@ -3433,6 +3484,9 @@ with tab_video:
                 progress_text = st.empty()
                 started_at = time.time()
                 try:
+                    duration_seconds = probe_media_duration(video_path)
+                    if duration_seconds > MAX_VIDEO_DURATION_SECONDS:
+                        raise ValueError("វីដេអូត្រូវមានរយៈពេលមិនលើស 15 នាទី។")
                     progress_text.markdown("🎧 កំពុងទាញសំឡេង និងស្គាល់ពាក្យពីវីដេអូ…")
 
                     # Stage 1 always works without Gemini: create source SRT once.
@@ -3440,7 +3494,8 @@ with tab_video:
                         future = executor.submit(transcribe_video_to_source_srt, video_path)
                         while not future.done():
                             elapsed = time.time() - started_at
-                            percent = min(58, max(2, int((elapsed / max(25.0, 20.0 + size_mb * 2.0)) * 58)))
+                            asr_estimate_seconds = max(25.0, duration_seconds * 0.18)
+                            percent = min(58, max(2, int((elapsed / asr_estimate_seconds) * 58)))
                             minutes, seconds = divmod(int(elapsed), 60)
                             progress_bar.progress(percent)
                             progress_text.markdown(f"### ⏱️ {percent}% • {minutes:02d}:{seconds:02d}<br>🎧 កំពុងស្គាល់សំឡេង…", unsafe_allow_html=True)
@@ -3466,7 +3521,8 @@ with tab_video:
                                 )
                                 while not future.done():
                                     elapsed = time.time() - started_at
-                                    percent = min(96, 62 + int((elapsed / max(40.0, 30.0 + size_mb * 2.5)) * 34))
+                                    translation_estimate_seconds = max(30.0, len(cues) * 0.42)
+                                    percent = min(96, 62 + int((elapsed / translation_estimate_seconds) * 34))
                                     minutes, seconds = divmod(int(elapsed), 60)
                                     progress_bar.progress(percent)
                                     progress_text.markdown(f"### ⏱️ {percent}% • {minutes:02d}:{seconds:02d}<br>🌐 កំពុងបកប្រែទៅភាសាខ្មែរ…", unsafe_allow_html=True)
@@ -3704,21 +3760,9 @@ with tab_translate:
                         }
                         for cue in source_cues
                     ]
-                    last_error = None
-                    translated_map = None
-                    for api_key_value in valid_api_keys:
-                        try:
-                            client = genai.Client(api_key=api_key_value)
-                            translated_map = translate_cues_text_only(
-                                client, model, normalized_cues, translation_style
-                            )
-                            break
-                        except Exception as exc:
-                            last_error = exc
-                            if not (is_quota_error(exc) or is_invalid_key_error(exc)):
-                                raise
-                    if translated_map is None:
-                        raise RuntimeError(friendly_ai_error(last_error, len(valid_api_keys)))
+                    translated_map = translate_cues_text_only(
+                        valid_api_keys, model, normalized_cues, translation_style
+                    )
                 blocks = []
                 for cue in source_cues:
                     item = translated_map.get(cue["id"])
