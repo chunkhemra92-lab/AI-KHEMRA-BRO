@@ -181,30 +181,34 @@ div[data-baseweb="popover"] .st-key-api_keys_manager textarea{
     width:42px!important;height:38px!important;min-height:38px!important
   }
 
-  /* Mobile game-style Settings card: centered, narrow, tall, and independently scrollable. */
+  /* Compact game-style Settings drawer: narrow left side, dark, and independently scrollable. */
   div[data-baseweb="popover"]{
     position:fixed!important;
-    top:7dvh!important;
-    left:50%!important;
-    transform:translateX(-50%)!important;
-    width:min(82vw,360px)!important;
-    max-width:calc(100vw - 40px)!important;
-    max-height:86dvh!important;
+    top:9dvh!important;
+    left:12px!important;
+    right:auto!important;
+    transform:none!important;
+    width:min(54vw,300px)!important;
+    max-width:calc(100vw - 118px)!important;
+    height:82dvh!important;
+    max-height:82dvh!important;
     overflow-y:auto!important;
     overscroll-behavior:contain!important;
     box-sizing:border-box!important;
-    padding:18px 16px 22px!important;
-    background:#f8fafc!important;
-    border:1px solid #d7e2ef!important;
-    border-radius:28px!important;
-    box-shadow:0 20px 48px rgba(0,0,0,.48)!important;
+    padding:18px 14px 26px!important;
+    background:#0c1424!important;
+    border:1px solid #22d3ee!important;
+    border-radius:20px!important;
+    box-shadow:14px 14px 36px rgba(0,0,0,.55)!important;
     scrollbar-width:thin;
-    scrollbar-color:#38bdf8 transparent;
+    scrollbar-color:#38d9f5 #0c1424;
   }
+  div[data-baseweb="popover"] > div,
   div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{
     width:100%!important;
     min-width:0!important;
     max-width:none!important;
+    background:#0c1424!important;
   }
 }
 
@@ -518,23 +522,24 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
     left:12px!important;
     right:auto!important;
     transform:none!important;
-    width:min(72vw,360px)!important;
-    max-width:calc(100vw - 72px)!important;
-    height:84dvh!important;
-    max-height:84dvh!important;
+    width:min(54vw,300px)!important;
+    max-width:calc(100vw - 118px)!important;
+    height:82dvh!important;
+    max-height:82dvh!important;
     margin:0!important;
     padding:20px 16px 38px!important;
     overflow-y:auto!important;
     overscroll-behavior:contain!important;
-    background:#111a2c!important;
+    background:#0c1424!important;
     border:1px solid #23d7f2!important;
     border-radius:22px!important;
     box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;
     color:#f8fafc!important;
   }
+  div[data-baseweb="popover"] > div,
   div[data-baseweb="popover"] [data-testid="stVerticalBlock"],
   div[data-baseweb="popover"] [data-testid="stVerticalBlock"] > div{
-    background:transparent!important;
+    background:#0c1424!important;
   }
 }
 
