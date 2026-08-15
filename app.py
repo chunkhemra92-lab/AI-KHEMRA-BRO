@@ -473,6 +473,7 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .settings-drawer-note{margin:0 0 16px!important;color:#aab7cb!important;font-size:13px!important;line-height:1.5!important}
 .settings-drawer-section{margin:20px 0 9px!important;color:#ffffff!important;font-size:19px!important;font-weight:900!important}
 .settings-drawer-section + p{color:#b9c5d7!important}
+.settings-account-name{margin:0 38px 8px 0!important;color:#ffffff!important;font-size:18px!important;font-weight:900!important;line-height:1.25!important;overflow-wrap:anywhere!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
@@ -2954,26 +2955,22 @@ if "settings_drawer_open" not in st.session_state:
     st.session_state.settings_drawer_open = False
 
 with st.container(key="settings_drawer_toggle"):
-    if st.button("☰", key="open_settings_drawer", help="Settings"):
+    if st.button("⚙️", key="open_settings_drawer", help="Open or close Settings"):
         st.session_state.settings_drawer_open = not st.session_state.settings_drawer_open
         st.rerun()
 
 if st.session_state.settings_drawer_open:
     with st.container(key="settings_drawer"):
-        if st.button("× Close", key="close_settings_drawer", use_container_width=True):
-            st.session_state.settings_drawer_open = False
-            st.rerun()
-        st.markdown('<h2 class="settings-drawer-title">⚙️ Settings</h2>', unsafe_allow_html=True)
-        st.markdown(
-            '<p class="settings-drawer-note">ការកំណត់ត្រូវបានរក្សាទុកម្តងសម្រាប់ Access Code នេះ ហើយអាចប្រើលើទូរសព្ទផ្សេងៗបាន។</p>',
-            unsafe_allow_html=True,
-        )
-
+        # Keep the customer identity and their private subscription timing first.
         private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
         private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
         private_now = _utcnow()
         private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
-        st.markdown('<h3 class="settings-drawer-section">👤 Account & Plan</h3>', unsafe_allow_html=True)
+        private_customer_name = str(dict(login_row).get("customer_name") or st.session_state.get("customer_name") or "Customer")
+        st.markdown(
+            f'<p class="settings-account-name">👤 {html.escape(private_customer_name)}</p>',
+            unsafe_allow_html=True,
+        )
         render_private_subscription_countdown(private_expiry, private_plan)
         if not private_active:
             st.error("❌ កញ្ចប់បានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិ។")
@@ -2988,6 +2985,12 @@ if st.session_state.settings_drawer_open:
                 st.session_state.pop(key, None)
             st.rerun()
 
+        st.divider()
+        st.markdown('<h2 class="settings-drawer-title">⚙️ Settings</h2>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="settings-drawer-note">ការកំណត់ត្រូវបានរក្សាទុកម្តងសម្រាប់ Access Code នេះ ហើយអាចប្រើលើទូរសព្ទផ្សេងៗបាន។</p>',
+            unsafe_allow_html=True,
+        )
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
         st.caption("សោត្រូវបានអ៊ិនគ្រីប និងចែករំលែកតែជាមួយទូរសព្ទដែលប្រើ Access Code ដូចគ្នា។")
