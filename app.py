@@ -539,6 +539,48 @@ Rules:
 - JSON only. No explanations or markdown.
 """
 
+TRANSLATION_STYLE_OPTIONS = [
+    "🗣 បែបធម្មជាតិ (Standard/Natural)",
+    "⚡️ ប្រយោគខ្លីៗ (Short for Lipsync)",
+    "🤣 បែបកំប្លែង (Comedy)",
+    "👔 បែបផ្លូវការ (Formal)",
+]
+DEFAULT_TRANSLATION_STYLE = TRANSLATION_STYLE_OPTIONS[0]
+TRANSLATION_STYLE_INSTRUCTIONS = {
+    TRANSLATION_STYLE_OPTIONS[0]: (
+        "Use smooth, natural everyday Khmer that sounds balanced when spoken aloud. "
+        "Preserve the source meaning, emotion, and character relationship."
+    ),
+    TRANSLATION_STYLE_OPTIONS[1]: (
+        "Use the shortest natural Khmer phrasing that still preserves every meaning, "
+        "response, negation, name, and emotion. Favor compact speech for lip-sync timing; "
+        "never make a sentence incomplete or remove meaning."
+    ),
+    TRANSLATION_STYLE_OPTIONS[2]: (
+        "Use lively, playful Khmer timing and wording when the source scene is genuinely humorous. "
+        "Preserve the original meaning and do not invent jokes, mockery, or comedy in serious scenes."
+    ),
+    TRANSLATION_STYLE_OPTIONS[3]: (
+        "Use polite, clear, professional Khmer appropriate for formal, official, or high-status dialogue. "
+        "Avoid casual slang while preserving the source meaning, emotion, and relationship."
+    ),
+}
+
+
+def translation_style_instruction(style):
+    return TRANSLATION_STYLE_INSTRUCTIONS.get(
+        style, TRANSLATION_STYLE_INSTRUCTIONS[DEFAULT_TRANSLATION_STYLE]
+    )
+
+
+def translation_prompt_for_style(style):
+    return (
+        TRANSLATE_PROMPT
+        + "\n\nSELECTED TRANSLATION STYLE (MANDATORY):\n"
+        + translation_style_instruction(style)
+    )
+
+
 API_COOKIE_NAME = "ai_khemra_bro_private_api"
 COOKIE_SECRET_CONFIGURED = False
 
@@ -1299,8 +1341,11 @@ def _candidate_gemini_models(selected_model):
     return result
 
 
-def _translate_batch_text_only(client, model_name, batch, previous_context=""):
+def _translate_batch_text_only(
+    client, model_name, batch, previous_context="", translation_style=DEFAULT_TRANSLATION_STYLE
+):
     """Translate Whisper text only. This avoids costly video upload requests."""
+    style_instructions = translation_style_instruction(translation_style)
     cue_lines = "\n".join(
         f'ID={cue["id"]} | TIME={seconds_to_srt(cue["start"])} --> '
         f'{seconds_to_srt(cue["end"])} | SOURCE={cue["source"]}'
@@ -1308,7 +1353,10 @@ def _translate_batch_text_only(client, model_name, batch, previous_context=""):
     )
     prompt = f"""
 You are the Khmer subtitle translation engine for AI KHEMRA BRO.
-Translate every SOURCE line into natural spoken Khmer for movie dubbing.
+Translate every SOURCE line into Khmer for movie dubbing.
+
+SELECTED TRANSLATION STYLE (MANDATORY):
+{style_instructions}
 
 STRICT RULES:
 1. Return JSON array only. No markdown and no explanation.
@@ -1347,7 +1395,9 @@ CUES:
     return parsed
 
 
-def translate_cues_text_only(client, model_name, cues):
+def translate_cues_text_only(
+    client, model_name, cues, translation_style=DEFAULT_TRANSLATION_STYLE
+):
     """Low-request translation path designed for free-tier Gemini keys."""
     translated = {}
     # Larger batches reduce request count and 429 failures.
@@ -1362,14 +1412,16 @@ def translate_cues_text_only(client, model_name, cues):
                     f'ID={cue["id"]} TAG={item["tag"]} SOURCE={cue["source"]} KHMER={item["text"]}'
                 )
         parsed = _translate_batch_text_only(
-            client, model_name, batch, "\n".join(context_rows)
+            client, model_name, batch, "\n".join(context_rows), translation_style
         )
         translated.update(parsed)
 
         missing = [cue for cue in batch if cue["id"] not in translated]
         if missing:
             # One compact repair request, only for missing lines.
-            repaired = _translate_batch_text_only(client, model_name, missing)
+            repaired = _translate_batch_text_only(
+                client, model_name, missing, translation_style=translation_style
+            )
             translated.update(repaired)
 
         still_missing = [cue["id"] for cue in batch if cue["id"] not in translated]
@@ -1381,7 +1433,9 @@ def translate_cues_text_only(client, model_name, cues):
     return translated
 
 
-def video_to_srt(video_path, api_keys, model, prepared_cues=None):
+def video_to_srt(
+    video_path, api_keys, model, prepared_cues=None, translation_style=DEFAULT_TRANSLATION_STYLE
+):
     """
     Reliable v5.5 path:
     FFmpeg -> Whisper timestamps -> text-only Gemini translation -> Khmer SRT.
@@ -1408,7 +1462,9 @@ def video_to_srt(video_path, api_keys, model, prepared_cues=None):
         client = genai.Client(api_key=api_key_value)
         for model_name in _candidate_gemini_models(model):
             try:
-                translated = translate_cues_text_only(client, model_name, cues)
+                translated = translate_cues_text_only(
+                    client, model_name, cues, translation_style
+                )
                 result = build_srt(cues, translated)
                 if not result.strip() or "-->" not in result:
                     raise RuntimeError("មិនអាចបង្កើត Khmer SRT បានទេ។")
@@ -2622,13 +2678,17 @@ if "api_keys_manager" not in st.session_state:
 # Defaults are per user/session; no user's working data is shared with another.
 for state_key, default_value in {
     "target_language": "Khmer (ខ្មែរ)",
-    "translation_style": "🔴 Chinese Drama Pro",
+    "translation_style": DEFAULT_TRANSLATION_STYLE,
     "model_selector": "gemini-3.5-flash-lite",
     "lite_mode": True,
     "api_saved_notice": False,
 }.items():
     if state_key not in st.session_state:
         st.session_state[state_key] = default_value
+
+# Replace the previous style values with the supported choices for existing sessions.
+if st.session_state.get("translation_style") not in TRANSLATION_STYLE_OPTIONS:
+    st.session_state.translation_style = DEFAULT_TRANSLATION_STYLE
 
 with st.container(key="api_menu_container"):
     with st.popover("☰", help="API Key និងការកំណត់កម្មវិធី"):
@@ -2649,8 +2709,9 @@ with st.container(key="api_menu_container"):
         st.selectbox("🌍 Target Language", ["Khmer (ខ្មែរ)"], key="target_language")
         st.radio(
             "🎭 Translation Style",
-            ["🔴 Chinese Drama Pro", "⚪ Whisper Timestamp Sync", "⚪ Standard"],
+            TRANSLATION_STYLE_OPTIONS,
             key="translation_style",
+            help="ជ្រើសរើសទម្រង់សម្រាប់ការបកប្រែ។ ជម្រើសនេះប៉ះពាល់តែសម្លេង និងរបៀបសរសេរ មិនប្ដូរ timestamp ឬន័យដើមទេ។",
         )
         st.selectbox(
             "🤖 Gemini Model",
@@ -2790,7 +2851,14 @@ with tab_video:
                         progress_text.markdown("### ⏱️ 62%<br>🌐 កំពុងបកប្រែទៅភាសាខ្មែរ…", unsafe_allow_html=True)
                         try:
                             with ThreadPoolExecutor(max_workers=1) as executor:
-                                future = executor.submit(video_to_srt, video_path, valid_api_keys, model, cues)
+                                future = executor.submit(
+                                    video_to_srt,
+                                    video_path,
+                                    valid_api_keys,
+                                    model,
+                                    cues,
+                                    translation_style,
+                                )
                                 while not future.done():
                                     elapsed = time.time() - started_at
                                     percent = min(96, 62 + int((elapsed / max(40.0, 30.0 + size_mb * 2.5)) * 34))
@@ -3024,7 +3092,7 @@ with tab_translate:
                         f'ID={cue["id"]} | SOURCE={cue["text"]}' for cue in batch
                     )
                     response = gemini_generate_with_retry(
-                        client, model, TRANSLATE_PROMPT + "\n\nCUES:\n" + payload
+                        client, model, translation_prompt_for_style(translation_style) + "\n\nCUES:\n" + payload
                     )
                     for item in parse_json_array(response.text or ""):
                         cue_id = int(item.get("id"))
