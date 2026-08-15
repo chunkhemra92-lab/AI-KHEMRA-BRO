@@ -1,0 +1,8 @@
+licenses.db
+licenses.db-shm
+licenses.db-wal
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+*.mp3
+*.srt
