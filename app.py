@@ -117,9 +117,15 @@ button[data-baseweb="tab"][aria-selected="true"]{
 }
 div[data-baseweb="popover"]{
   z-index:1000001!important;
+  border-radius:28px!important;
 }
 div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{
   min-width:min(88vw,390px);
+}
+/* Keep the private key field visually distinct inside the Settings card. */
+div[data-baseweb="popover"] .st-key-api_keys_manager textarea{
+  border:1px solid #38bdf8!important;
+  box-shadow:0 0 0 3px rgba(56,189,248,.12)!important;
 }
 
 /* Discreet owner trigger. It looks like a decorative UI element. */
@@ -168,6 +174,32 @@ div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{
   .st-key-api_menu_container{top:5px!important;left:5px!important;width:42px!important}
   .st-key-api_menu_container button{
     width:42px!important;height:38px!important;min-height:38px!important
+  }
+
+  /* Mobile game-style Settings card: centered, narrow, tall, and independently scrollable. */
+  div[data-baseweb="popover"]{
+    position:fixed!important;
+    top:7dvh!important;
+    left:50%!important;
+    transform:translateX(-50%)!important;
+    width:min(82vw,360px)!important;
+    max-width:calc(100vw - 40px)!important;
+    max-height:86dvh!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    box-sizing:border-box!important;
+    padding:18px 16px 22px!important;
+    background:#f8fafc!important;
+    border:1px solid #d7e2ef!important;
+    border-radius:28px!important;
+    box-shadow:0 20px 48px rgba(0,0,0,.48)!important;
+    scrollbar-width:thin;
+    scrollbar-color:#38bdf8 transparent;
+  }
+  div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
   }
 }
 
