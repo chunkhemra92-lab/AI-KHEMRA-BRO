@@ -468,80 +468,29 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   .social-split a{font-size:15px}
 }
 
-/* Scrollable Settings drawer. It is intentionally independent from the project workspace. */
-.settings-drawer-title{margin:0 0 6px!important;color:#ffffff!important;font-size:30px!important;font-weight:950!important}
-.settings-drawer-note{margin:0 0 18px;color:#aab7cb;font-size:14px;line-height:1.55}
-.settings-drawer-section{margin:22px 0 10px!important;color:#ffffff!important;font-size:24px!important;font-weight:900!important}
+/* Private Settings drawer. This is an app-owned container, not a BaseWeb popover. */
+.settings-drawer-title{margin:0 0 6px!important;color:#ffffff!important;font-size:25px!important;font-weight:950!important}
+.settings-drawer-note{margin:0 0 16px!important;color:#aab7cb!important;font-size:13px!important;line-height:1.5!important}
+.settings-drawer-section{margin:20px 0 9px!important;color:#ffffff!important;font-size:19px!important;font-weight:900!important}
 .settings-drawer-section + p{color:#b9c5d7!important}
+.st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
+.st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
+.st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
+.st-key-settings_drawer{position:fixed!important;top:68px!important;left:12px!important;z-index:1000000!important;width:min(380px,calc(100vw - 38px))!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;box-sizing:border-box!important;margin:0!important;padding:20px 18px 34px!important;overflow-y:auto!important;overscroll-behavior:contain!important;background:#0c1424!important;border:1px solid #23d7f2!important;border-radius:22px!important;box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;color:#f8fafc!important;scrollbar-width:thin;scrollbar-color:#38d9f5 #0c1424}
+.st-key-settings_drawer > div,.st-key-settings_drawer [data-testid="stVerticalBlock"],.st-key-settings_drawer [data-testid="stVerticalBlock"] > div{width:100%!important;min-width:0!important;background:transparent!important}
+.st-key-settings_drawer [data-testid="stMarkdownContainer"] p,.st-key-settings_drawer label,.st-key-settings_drawer label p,.st-key-settings_drawer [data-testid="stCaptionContainer"]{color:#f8fafc!important}
+.st-key-settings_drawer [data-baseweb="select"] > div,.st-key-settings_drawer input,.st-key-settings_drawer textarea{background:#202b3d!important;color:#ffffff!important;border-color:#dbe7f4!important}
+.st-key-settings_drawer textarea::placeholder,.st-key-settings_drawer input::placeholder{color:#abb9cc!important}
+.st-key-settings_drawer hr{border-color:#273650!important}
+.st-key-settings_drawer .stAlert{border-radius:14px!important}
 @media(max-width:700px){
-  div[data-baseweb="popover"]{
-    position:fixed!important;
-    top:0!important;
-    left:0!important;
-    transform:none!important;
-    width:min(82vw,430px)!important;
-    max-width:calc(100vw - 48px)!important;
-    height:100dvh!important;
-    max-height:100dvh!important;
-    margin:0!important;
-    padding:28px 18px 52px!important;
-    overflow-y:auto!important;
-    overscroll-behavior:contain!important;
-    background:#111a2c!important;
-    border:0!important;
-    border-right:2px solid #38d9f5!important;
-    border-radius:0 24px 24px 0!important;
-    box-shadow:18px 0 42px rgba(0,0,0,.48)!important;
-    color:#f8fafc!important;
-    scrollbar-width:thin;
-    scrollbar-color:#38d9f5 #111a2c;
-  }
-  div[data-baseweb="popover"] [data-testid="stVerticalBlock"]{width:100%!important;min-width:0!important}
-  div[data-baseweb="popover"] [data-testid="stMarkdownContainer"] p,
-  div[data-baseweb="popover"] label,
-  div[data-baseweb="popover"] label p{color:#f8fafc!important}
-  div[data-baseweb="popover"] [data-baseweb="select"] > div,
-  div[data-baseweb="popover"] input,
-  div[data-baseweb="popover"] textarea{
-    background:#202b3d!important;color:#ffffff!important;border-color:#dbe7f4!important
-  }
-  div[data-baseweb="popover"] textarea::placeholder,
-  div[data-baseweb="popover"] input::placeholder{color:#abb9cc!important}
-  div[data-baseweb="popover"] hr{border-color:#273650!important}
-  div[data-baseweb="popover"] .stAlert{border-radius:14px!important}
-  .st-key-api_menu_container{top:12px!important;left:12px!important}
-  .st-key-api_menu_container button{width:48px!important;height:46px!important;min-height:46px!important;border-radius:14px!important}
-
-  /* Final nested-surface override for Streamlit's BaseWeb popover on iPhone/Android. */
-  body > div[data-baseweb="popover"],
-  div[data-baseweb="popover"],
-  div[data-baseweb="popover"] > div:first-child,
-  div[data-baseweb="popover"] [role="dialog"]{
-    position:fixed!important;
-    top:8dvh!important;
-    left:12px!important;
-    right:auto!important;
-    transform:none!important;
-    width:min(54vw,300px)!important;
-    max-width:calc(100vw - 118px)!important;
-    height:82dvh!important;
-    max-height:82dvh!important;
-    margin:0!important;
-    padding:20px 16px 38px!important;
-    overflow-y:auto!important;
-    overscroll-behavior:contain!important;
-    background:#0c1424!important;
-    border:1px solid #23d7f2!important;
-    border-radius:22px!important;
-    box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;
-    color:#f8fafc!important;
-  }
-  div[data-baseweb="popover"] > div,
-  div[data-baseweb="popover"] [data-testid="stVerticalBlock"],
-  div[data-baseweb="popover"] [data-testid="stVerticalBlock"] > div{
-    background:#0c1424!important;
-  }
+  .st-key-settings_drawer{top:68px!important;left:12px!important;width:min(54vw,300px)!important;max-width:calc(100vw - 132px)!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;padding:18px 14px 32px!important;border-radius:20px!important}
+  .settings-drawer-title{font-size:22px!important}
+  .settings-drawer-section{font-size:17px!important}
+  .st-key-settings_drawer [data-testid="stWidgetLabel"] p,.st-key-settings_drawer label p{font-size:13px!important}
+  .st-key-settings_drawer [data-testid="stRadio"] label{font-size:13px!important}
 }
+
 
 </style>
 ''', unsafe_allow_html=True)
@@ -3001,8 +2950,19 @@ if st.session_state.get("audio_sync_mode") not in AUDIO_SYNC_OPTIONS:
 if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
     st.session_state.voice_mode = "Auto"
 
-with st.container(key="api_menu_container"):
-    with st.popover("☰", help="Settings"):
+if "settings_drawer_open" not in st.session_state:
+    st.session_state.settings_drawer_open = False
+
+with st.container(key="settings_drawer_toggle"):
+    if st.button("☰", key="open_settings_drawer", help="Settings"):
+        st.session_state.settings_drawer_open = not st.session_state.settings_drawer_open
+        st.rerun()
+
+if st.session_state.settings_drawer_open:
+    with st.container(key="settings_drawer"):
+        if st.button("× Close", key="close_settings_drawer", use_container_width=True):
+            st.session_state.settings_drawer_open = False
+            st.rerun()
         st.markdown('<h2 class="settings-drawer-title">⚙️ Settings</h2>', unsafe_allow_html=True)
         st.markdown(
             '<p class="settings-drawer-note">ការកំណត់ត្រូវបានរក្សាទុកម្តងសម្រាប់ Access Code នេះ ហើយអាចប្រើលើទូរសព្ទផ្សេងៗបាន។</p>',
