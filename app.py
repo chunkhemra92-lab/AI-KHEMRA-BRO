@@ -507,6 +507,35 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   div[data-baseweb="popover"] .stAlert{border-radius:14px!important}
   .st-key-api_menu_container{top:12px!important;left:12px!important}
   .st-key-api_menu_container button{width:48px!important;height:46px!important;min-height:46px!important;border-radius:14px!important}
+
+  /* Final nested-surface override for Streamlit's BaseWeb popover on iPhone/Android. */
+  body > div[data-baseweb="popover"],
+  div[data-baseweb="popover"],
+  div[data-baseweb="popover"] > div:first-child,
+  div[data-baseweb="popover"] [role="dialog"]{
+    position:fixed!important;
+    top:8dvh!important;
+    left:12px!important;
+    right:auto!important;
+    transform:none!important;
+    width:min(72vw,360px)!important;
+    max-width:calc(100vw - 72px)!important;
+    height:84dvh!important;
+    max-height:84dvh!important;
+    margin:0!important;
+    padding:20px 16px 38px!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    background:#111a2c!important;
+    border:1px solid #23d7f2!important;
+    border-radius:22px!important;
+    box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;
+    color:#f8fafc!important;
+  }
+  div[data-baseweb="popover"] [data-testid="stVerticalBlock"],
+  div[data-baseweb="popover"] [data-testid="stVerticalBlock"] > div{
+    background:transparent!important;
+  }
 }
 
 </style>
