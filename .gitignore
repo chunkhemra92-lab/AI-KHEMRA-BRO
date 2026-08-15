@@ -1,8 +1,17 @@
-licenses.db
-licenses.db-shm
-licenses.db-wal
-.streamlit/secrets.toml
-__pycache__/
-*.pyc
-*.mp3
-*.srt
+# Private
+customer and application data licenses.db
+licenses. db-shm licenses.db-wal
+# Local
+Streamlit secrets and
+browser/session data
+. streamlit/ secrets.toml
+*. cookie
+# Python
+temporary files _pycache_
+*.py[cod]
+# Local
+diagnostics, generated media, and temporary project work
+*. log
+*.tmp
+ai_khemra_bro_se
+ssions/ ui_test_asset/
