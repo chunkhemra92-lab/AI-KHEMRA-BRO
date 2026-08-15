@@ -952,6 +952,12 @@ def delete_private_api_keys():
 
 
 
+def save_api_keys_from_manager():
+    """Persist the simple multiline manager automatically after its owner edits it."""
+    save_private_api_keys(st.session_state.get("api_keys_manager", ""))
+
+
+
 def _normalized_api_keys(api_keys_text):
     """Normalize and deduplicate API keys without ever rendering them to the UI."""
     values = []
@@ -3294,67 +3300,15 @@ if st.session_state.settings_drawer_open:
             on_change=account_settings_changed, label_visibility="collapsed",
         )
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🔐 AI Studio Keys</h3>', unsafe_allow_html=True)
-        saved_gemini_keys = _normalized_api_keys(st.session_state.get("api_keys_manager", ""))
-        st.link_button("➕ AI Studio", "https://aistudio.google.com/apikey", use_container_width=True, key="google_ai_studio_link")
-        st.text_input("API Key", type="password", placeholder="AIza...", key="gemini_key_to_add", label_visibility="collapsed")
-        if st.button("➕ Add Key", key="add_gemini_key", use_container_width=True):
-            new_key = str(st.session_state.get("gemini_key_to_add", "")).strip()
-            if new_key:
-                merged_keys = _normalized_api_keys("\n".join(saved_gemini_keys + [new_key]))
-                protected_keys = "\n".join(merged_keys)
-                if save_private_api_keys(protected_keys):
-                    st.session_state.api_keys_manager = protected_keys
-                    synchronized_api_key_metadata(protected_keys, persist_missing=True)
-                    st.session_state.clear_api_key_input_after_save = True
-                    st.rerun()
-                else:
-                    st.error("❌ មិនអាចរក្សាទុកបាន")
-        key_metadata = synchronized_api_key_metadata("\n".join(saved_gemini_keys), persist_missing=bool(saved_gemini_keys))
-        if saved_gemini_keys:
-            st.markdown(f'<p class="vault-key-list-title">📁 Keys ({len(saved_gemini_keys)})</p>', unsafe_allow_html=True)
-            for raw_key_value, record in zip(saved_gemini_keys, key_metadata):
-                fingerprint = record["fingerprint"]
-                name_widget = f"vault_key_name_{fingerprint}"
-                expiry_widget = f"vault_key_expiry_{fingerprint}"
-                if name_widget not in st.session_state:
-                    st.session_state[name_widget] = record.get("name") or "Gemini Key"
-                if expiry_widget not in st.session_state:
-                    try:
-                        st.session_state[expiry_widget] = datetime.date.fromisoformat(record["expires_on"]) if record.get("expires_on") else None
-                    except ValueError:
-                        st.session_state[expiry_widget] = None
-                st.markdown('<div class="vault-key-row active">', unsafe_allow_html=True)
-                st.code(raw_key_value, language=None)
-                meta_col, expiry_col = st.columns([1, 1], gap="small")
-                with meta_col:
-                    st.text_input("Name", key=name_widget, max_chars=80, label_visibility="collapsed")
-                with expiry_col:
-                    st.date_input("Expire", key=expiry_widget, value=None, label_visibility="collapsed")
-                test_col, save_col = st.columns([1, 1], gap="small")
-                with test_col:
-                    if st.button("🔌 Test", key=f"test_vault_key_{fingerprint}", use_container_width=True):
-                        with st.spinner("Testing..."):
-                            test_ok, tested_model, test_message = test_gemini_vault_key(
-                                raw_key_value,
-                                st.session_state.get("model_selector", DEFAULT_GEMINI_TRANSLATION_MODEL),
-                            )
-                        if test_ok:
-                            st.success(f"✅ {tested_model}")
-                        else:
-                            st.error(test_message)
-                with save_col:
-                    if st.button("💾 Save", key=f"save_vault_key_metadata_{fingerprint}", use_container_width=True):
-                        chosen_expiry = st.session_state.get(expiry_widget)
-                        for editable_record in key_metadata:
-                            if editable_record["fingerprint"] == fingerprint:
-                                editable_record["name"] = str(st.session_state.get(name_widget) or "Gemini Key").strip()[:80] or "Gemini Key"
-                                editable_record["expires_on"] = chosen_expiry.isoformat() if isinstance(chosen_expiry, datetime.date) else ""
-                        if _save_api_key_metadata(key_metadata):
-                            st.rerun()
-                        else:
-                            st.error("❌ មិនអាចរក្សាទុកបាន")
-                st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
+        st.caption("Paste Gemini API Keys (One per line)")
+        st.text_area(
+            "Gemini API Keys", height=92, key="api_keys_manager", label_visibility="collapsed",
+            placeholder="AIza...", on_change=save_api_keys_from_manager,
+        )
+        simple_key_count = len(_normalized_api_keys(st.session_state.get("api_keys_manager", "")))
+        if simple_key_count:
+            st.success(f"✅ មាន {simple_key_count} Keys")
 
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
