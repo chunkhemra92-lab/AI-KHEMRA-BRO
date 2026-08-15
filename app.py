@@ -479,6 +479,9 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .settings-profile-detail{margin:8px 0!important;color:#edf4fb!important;font-size:14px!important;font-weight:750!important;line-height:1.4!important;overflow-wrap:anywhere!important}
 .settings-profile-days{margin:11px 0 0!important;color:#ffffff!important;font-size:17px!important;font-weight:950!important;letter-spacing:.2px!important}
 .st-key-customer_logout button{min-height:52px!important;border:0!important;border-radius:12px!important;background:linear-gradient(135deg,#8b00f5,#df00ef)!important;box-shadow:0 8px 20px rgba(192,0,238,.26)!important;font-size:16px!important}
+.st-key-google_ai_studio_link a{min-height:42px!important;border:1px solid #30d5f2!important;border-radius:12px!important;background:#12384b!important;color:#ffffff!important;font-weight:850!important;box-shadow:none!important}
+.st-key-connect_google_ai_studio button{min-height:48px!important;border-radius:12px!important;background:linear-gradient(90deg,#0b87cd,#22d3ee)!important}
+.google-ai-studio-status{margin:9px 0 0!important;padding:9px 10px!important;border:1px solid rgba(34,211,238,.45)!important;border-radius:12px!important;background:rgba(8,145,178,.13)!important;color:#d8f7ff!important;font-size:13px!important;font-weight:750!important;line-height:1.45!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
@@ -3033,22 +3036,32 @@ if st.session_state.settings_drawer_open:
             on_change=account_settings_changed, label_visibility="collapsed",
         )
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
-        st.caption("Paste Gemini API Keys (One per line)")
-        st.text_area(
-            "Gemini API Keys", height=92, placeholder="AIza... (one key per line)",
-            key="api_keys_manager", label_visibility="collapsed",
-            help="បញ្ចូល Gemini API Key មួយក្នុងមួយជួរ។ សោត្រូវបានអ៊ិនគ្រីបតាម Access Code នេះ។",
+        st.markdown('<h3 class="settings-drawer-section">🔗 Connect Google AI Studio</h3>', unsafe_allow_html=True)
+        st.caption("ភ្ជាប់ Gemini API Key ដើម្បីប្រើ Google AI Studio សម្រាប់ការបកប្រែ។")
+        st.link_button(
+            "🌐 បង្កើត Gemini API Key ក្នុង Google AI Studio",
+            "https://aistudio.google.com/apikey",
+            use_container_width=True,
+            key="google_ai_studio_link",
         )
-        if st.button("💾 Save Gemini Keys", key="save_api_keys", use_container_width=True):
+        st.caption("1. បើកតំណខាងលើ  2. បង្កើត API Key  3. បិទភ្ជាប់សោខាងក្រោម")
+        st.text_area(
+            "Gemini API Key", height=92, placeholder="AIza... (one key per line)",
+            key="api_keys_manager", label_visibility="collapsed",
+            help="អ្នកអាចដាក់ API Key ច្រើនបាន (មួយសោក្នុងមួយជួរ)។ សោត្រូវបានអ៊ិនគ្រីបតាម Access Code នេះ។",
+        )
+        if st.button("🔗 Connect & Save Google AI Studio", key="connect_google_ai_studio", use_container_width=True):
             entered_keys = [line.strip() for line in st.session_state.api_keys_manager.splitlines() if line.strip()]
             if entered_keys:
                 save_private_api_keys(st.session_state.api_keys_manager)
-                st.success("✅ បានរក្សាទុក Gemini API Key រួចរាល់។")
+                st.success("✅ បានភ្ជាប់ និងរក្សាទុក Gemini API Key រួចរាល់។")
             else:
-                st.warning("⚠️ សូមបញ្ចូល API Key មួយយ៉ាងហោចណាស់។")
-        if st.session_state.get("translation_provider", "Gemini") == "Gemini" and not [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]:
-            st.warning("⚠️ សូមបញ្ចូល Gemini API Key ដើម្បីប្រើការបកប្រែ។")
+                st.warning("⚠️ សូមបិទភ្ជាប់ Gemini API Key ជាមុន។")
+        saved_gemini_keys = [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]
+        if saved_gemini_keys:
+            st.markdown('<p class="google-ai-studio-status">✅ Google AI Studio បានភ្ជាប់រួច។ Gemini API Key ត្រូវបានរក្សាទុកជាឯកជនតាម Access Code នេះ។</p>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ មិនទាន់បានភ្ជាប់ Google AI Studio ទេ។ សូមបង្កើត និងបិទភ្ជាប់ Gemini API Key។")
 
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
