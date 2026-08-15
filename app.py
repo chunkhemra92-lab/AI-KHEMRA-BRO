@@ -136,7 +136,7 @@ div[data-baseweb="popover"] .st-key-api_keys_manager textarea{
 /* Discreet owner trigger. It looks like a decorative UI element. */
 .st-key-owner_trigger_container{
   position:fixed!important;top:8px!important;right:8px!important;
-  z-index:1000000!important;width:42px!important;
+  z-index:1000000!important;width:42px!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;
 }
 .st-key-owner_trigger_container button{
   width:42px!important;height:38px!important;min-height:38px!important;
@@ -499,7 +499,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer [data-testid="stSelectbox"] > div{border-radius:14px!important}
 .st-key-settings_drawer .stCaption{color:#b9c8dc!important;line-height:1.48!important}
 .st-key-main_srt_editor textarea,.st-key-translator_source textarea,.st-key-speech_srt_input textarea{min-height:300px!important;height:300px!important;border-radius:16px!important;background:#1c2a3d!important}
-.st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important}
+.st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important;width:50px!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
+[data-testid="stElementContainer"]:has(.st-key-owner_trigger_container),[data-testid="stElementContainer"]:has(.st-key-settings_drawer_toggle){height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
 .st-key-settings_drawer{position:fixed!important;top:68px!important;left:12px!important;z-index:1000000!important;width:min(380px,calc(100vw - 38px))!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;box-sizing:border-box!important;margin:0!important;padding:20px 18px 34px!important;overflow-y:auto!important;overscroll-behavior:contain!important;background:#0c1424!important;border:1px solid #23d7f2!important;border-radius:22px!important;box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;color:#f8fafc!important;scrollbar-width:thin;scrollbar-color:#38d9f5 #0c1424}
