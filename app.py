@@ -3309,8 +3309,10 @@ if st.session_state.settings_drawer_open:
         simple_key_count = len(_normalized_api_keys(st.session_state.get("api_keys_manager", "")))
         if simple_key_count:
             st.success(f"✅ មាន {simple_key_count} Keys")
-
+        else:
+            st.warning("⚠️ សូមបញ្ចូល API Key ដើម្បីប្រើការបកប្រែ។")
         st.divider()
+
         st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
         st.radio(
             "ជ្រើសរើស Translate API៖", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
