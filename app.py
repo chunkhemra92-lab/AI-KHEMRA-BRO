@@ -3010,19 +3010,32 @@ def delete_license(license_id):
     _audit("license_deleted", get_admin_username(), row["customer_name"] if row else str(license_id))
 
 
-def hidden_owner_trigger():
-    if "owner_click_count" not in st.session_state:
-        st.session_state.owner_click_count = 0
-    if "admin_gate_visible" not in st.session_state:
-        st.session_state.admin_gate_visible = False
-    with st.container(key="owner_trigger_container"):
-        clicked = st.button("✦", key="owner_trigger", help="AI KHEMRA BRO")
-    if clicked:
-        st.session_state.owner_click_count += 1
-        if st.session_state.owner_click_count >= 5:
-            st.session_state.owner_click_count = 0
-            st.session_state.admin_gate_visible = True
-            st.rerun()
+ADMIN_ROUTE_QUERY_KEY = "admin"
+DEFAULT_ADMIN_ROUTE_VALUE = "owner"
+
+
+def private_admin_route_requested():
+    """Allow the owner to open the dashboard directly through a private URL."""
+    try:
+        requested = str(st.query_params.get(ADMIN_ROUTE_QUERY_KEY, "")).strip()
+    except Exception:
+        requested = ""
+    configured_token = _secret("ADMIN_ROUTE_TOKEN")
+    expected = configured_token or DEFAULT_ADMIN_ROUTE_VALUE
+    return bool(requested) and hmac.compare_digest(
+        requested.casefold(), expected.casefold()
+    )
+
+
+def leave_private_admin_route():
+    """Return to the ordinary customer login route after admin logout/exit."""
+    st.session_state.admin_authenticated = False
+    st.session_state.admin_gate_visible = False
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+    st.rerun()
 
 
 
@@ -3219,9 +3232,7 @@ def admin_dashboard():
         st.error("Owner Access is locked until private Streamlit Secrets are configured.")
         st.caption("Configure ADMIN_USERNAME, ADMIN_PASSWORD, COOKIE_SECRET, and LICENSE_PEPPER in the hosting secrets, then restart the app.")
         if st.button("← ត្រឡប់ទៅ Customer Login", key="close_unconfigured_admin_gate", use_container_width=True):
-            st.session_state.admin_gate_visible = False
-            st.session_state.owner_click_count = 0
-            st.rerun()
+            leave_private_admin_route()
         return
 
     if not st.session_state.get("admin_authenticated", False):
@@ -3244,9 +3255,7 @@ def admin_dashboard():
                     _audit("admin_login_failed", username.strip() or "unknown", "failed")
                     st.error("Username ឬ Password មិនត្រឹមត្រូវ។")
             if st.button("← ត្រឡប់ទៅ Customer Login", key="close_admin_gate", use_container_width=True):
-                st.session_state.admin_gate_visible = False
-                st.session_state.owner_click_count = 0
-                st.rerun()
+                leave_private_admin_route()
         return
 
     top1, top2 = st.columns([4, 1])
@@ -3255,10 +3264,7 @@ def admin_dashboard():
     with top2:
         if st.button("ចាកចេញ", key="admin_logout", use_container_width=True):
             _audit("admin_logout", get_admin_username(), "success")
-            st.session_state.admin_authenticated = False
-            st.session_state.admin_gate_visible = False
-            st.session_state.owner_click_count = 0
-            st.rerun()
+            leave_private_admin_route()
 
     st.markdown("## ➕ បង្កើត Customer")
     st.caption("Owner ជាអ្នកកំណត់ Access Code ដោយខ្លួនឯង។ Code មួយអាច Login លើ iPhone, Android និង Browser ផ្សេងៗបាន ដោយមិនចងជាមួយឧបករណ៍។")
@@ -3365,8 +3371,10 @@ with license_connection() as _lock_cleanup_connection:
         "UPDATE licenses SET active_session_hash=NULL, active_session_last_seen=NULL"
     )
     _lock_cleanup_connection.commit()
-hidden_owner_trigger()
-if st.session_state.get("admin_gate_visible", False) or st.session_state.get("admin_authenticated", False):
+admin_route_requested = private_admin_route_requested()
+if admin_route_requested:
+    st.session_state.admin_gate_visible = True
+if admin_route_requested or st.session_state.get("admin_authenticated", False):
     admin_dashboard()
     st.stop()
 
