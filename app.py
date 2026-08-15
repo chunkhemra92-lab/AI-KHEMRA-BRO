@@ -484,6 +484,10 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .google-ai-studio-status{margin:9px 0 0!important;padding:9px 10px!important;border:1px solid rgba(34,211,238,.45)!important;border-radius:12px!important;background:rgba(8,145,178,.13)!important;color:#d8f7ff!important;font-size:13px!important;font-weight:750!important;line-height:1.45!important}
 .settings-ai-connection-banner{margin:0 0 12px!important;padding:13px 14px!important;border:1px solid rgba(34,211,238,.48)!important;border-radius:16px!important;background:linear-gradient(135deg,rgba(14,116,144,.26),rgba(8,47,73,.28))!important;box-shadow:inset 0 1px rgba(255,255,255,.05)!important}
 .settings-ai-connection-banner strong{display:block!important;color:#ecfeff!important;font-size:16px!important;font-weight:950!important;letter-spacing:.1px!important}
+.settings-ai-vault-card{margin:0 0 12px!important;padding:14px!important;border:1px solid rgba(74,222,128,.42)!important;border-radius:16px!important;background:linear-gradient(135deg,rgba(20,83,45,.36),rgba(6,78,59,.20))!important}
+.settings-ai-vault-card strong{display:block!important;color:#dcfce7!important;font-size:15px!important;font-weight:950!important}
+.settings-ai-vault-card span{display:block!important;margin-top:5px!important;color:#bbf7d0!important;font-size:12px!important;font-weight:750!important;line-height:1.45!important}
+.st-key-add_gemini_key button{min-height:46px!important;border-radius:12px!important;background:linear-gradient(90deg,#0f766e,#22c55e)!important}
 .settings-ai-connection-banner span{display:block!important;margin-top:4px!important;color:#a5f3fc!important;font-size:12px!important;font-weight:700!important;line-height:1.4!important}
 .st-key-settings_drawer [data-testid="stTextArea"] textarea{min-height:92px!important;border-radius:14px!important;box-shadow:inset 0 0 0 1px rgba(148,163,184,.16)!important}
 .st-key-settings_drawer [data-testid="stSelectbox"] > div{border-radius:14px!important}
@@ -3044,9 +3048,9 @@ if "api_keys_manager" not in st.session_state:
 # Never prefill a visible widget with saved secrets. The backend session keeps
 # keys only for processing; the connection input starts blank on every new session.
 if st.session_state.pop("clear_api_key_input_after_save", False):
-    st.session_state.pop("api_keys_input", None)
-if "api_keys_input" not in st.session_state:
-    st.session_state.api_keys_input = ""
+    st.session_state.pop("gemini_key_to_add", None)
+if "gemini_key_to_add" not in st.session_state:
+    st.session_state.gemini_key_to_add = ""
 
 # Saved settings belong to the Access Code, so the same customer sees the same
 # choices on every phone without affecting other customer accounts.
@@ -3118,42 +3122,49 @@ if st.session_state.settings_drawer_open:
             on_change=account_settings_changed, label_visibility="collapsed",
         )
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🔗 Connect Google AI Studio</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="settings-ai-connection-banner"><strong>🔒 Encrypted API Key Vault</strong><span>សោត្រូវបានអ៊ិនគ្រីបតាម Access Code និងមិនបង្ហាញឡើងវិញក្រោយពេលរក្សាទុក។</span></div>', unsafe_allow_html=True)
-        st.caption("ភ្ជាប់ Gemini API Key ដើម្បីប្រើ Google AI Studio សម្រាប់ការបកប្រែ។")
+        st.markdown('<h3 class="settings-drawer-section">🔐 AI Studio Key Vault</h3>', unsafe_allow_html=True)
+        saved_gemini_keys = [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]
+        st.markdown(
+            f'<div class="settings-ai-vault-card"><strong>🛡️ Encrypted Account Vault</strong><span>បានរក្សាទុក <b>{len(saved_gemini_keys)}</b> Gemini API Key ជាអ៊ិនគ្រីប។ Key ពិតមិនអាចមើល ឬចម្លងត្រឡប់ពីផ្ទាំងនេះបានទេ។</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.caption("ប្រើសម្រាប់ Gemini API ពី Google AI Studio — មិនមែន Google Assistant។")
         st.link_button(
             "🌐 បង្កើត Gemini API Key ក្នុង Google AI Studio",
             "https://aistudio.google.com/apikey",
             use_container_width=True,
             key="google_ai_studio_link",
         )
-        st.caption("1. បើកតំណខាងលើ  2. បង្កើត API Key  3. បិទភ្ជាប់សោខាងក្រោម")
-        st.text_area(
-            "Gemini API Key", height=92, placeholder="AIza... (one key per line)",
-            key="api_keys_input", label_visibility="collapsed",
-            help="សោក្នុងប្រអប់នេះមិនត្រូវបានបង្ហាញវិញទេ។ អ្នកអាចដាក់ API Key ច្រើនបាន (មួយសោក្នុងមួយជួរ)។",
+        st.caption("បង្កើត API Key ក្នុង AI Studio រួចបិទភ្ជាប់មួយសោម្តង។")
+        st.text_input(
+            "Add Gemini API Key", type="password", placeholder="AIza...",
+            key="gemini_key_to_add", label_visibility="collapsed",
+            help="អក្សរត្រូវបានបិទបាំងខណៈពេលវាយ ហើយត្រូវបានលុបចេញពីប្រអប់ភ្លាមក្រោយការរក្សាទុក។",
         )
-        if st.button("🔗 Connect & Save Google AI Studio", key="connect_google_ai_studio", use_container_width=True):
-            entered_keys = [line.strip() for line in st.session_state.api_keys_input.splitlines() if line.strip()]
-            if entered_keys:
-                candidate_keys = "\n".join(entered_keys)
-                if save_private_api_keys(candidate_keys):
-                    st.session_state.api_keys_manager = candidate_keys
+        if st.button("➕ Encrypt & Add Key", key="add_gemini_key", use_container_width=True):
+            new_key = str(st.session_state.get("gemini_key_to_add", "")).strip()
+            if new_key:
+                merged_keys = []
+                for candidate in saved_gemini_keys + [new_key]:
+                    if candidate not in merged_keys:
+                        merged_keys.append(candidate)
+                protected_keys = "\n".join(merged_keys)
+                if save_private_api_keys(protected_keys):
+                    st.session_state.api_keys_manager = protected_keys
                     st.session_state.clear_api_key_input_after_save = True
-                    st.session_state.api_key_saved_feedback = len(entered_keys)
+                    st.session_state.api_key_saved_feedback = len(merged_keys)
                     st.rerun()
                 else:
                     st.error("❌ មិនអាចរក្សាទុក Gemini API Key បានទេ។ សូមសាកម្ដងទៀត។")
             else:
                 st.warning("⚠️ សូមបិទភ្ជាប់ Gemini API Key ជាមុន។")
-        saved_gemini_keys = [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]
         saved_feedback_count = st.session_state.pop("api_key_saved_feedback", None)
         if saved_feedback_count:
             st.success(f"✅ បានអ៊ិនគ្រីប និងរក្សាទុក {saved_feedback_count} Gemini API Key រួចរាល់។")
         if saved_gemini_keys:
-            st.markdown(f'<p class="google-ai-studio-status">✅ Google AI Studio ត្រូវបានភ្ជាប់រួច។ បានរក្សាទុក <strong>{len(saved_gemini_keys)}</strong> API Key ជាអ៊ិនគ្រីបតាម Access Code នេះ។ Key ពិតមិនត្រូវបានបង្ហាញម្ដងទៀតទេ។</p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="google-ai-studio-status">✅ AI Studio Vault សកម្ម។ Browser cache ត្រូវបានអ៊ិនគ្រីប និងភ្ជាប់តែជាមួយ Access Code នេះ។</p>', unsafe_allow_html=True)
         else:
-            st.warning("⚠️ មិនទាន់បានភ្ជាប់ Google AI Studio ទេ។ សូមបង្កើត និងបិទភ្ជាប់ Gemini API Key។")
+            st.warning("⚠️ មិនទាន់មាន Gemini API Key ក្នុង Vault ទេ។")
 
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
