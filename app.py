@@ -511,6 +511,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-api_key_input_box [data-testid="stTextArea"],.st-key-api_key_input_box [data-baseweb="textarea"],.st-key-api_key_input_box textarea{display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;box-sizing:border-box!important}
 .st-key-api_key_input_box textarea{min-height:118px!important;height:118px!important;padding:12px!important;background:#202b3d!important;color:#ffffff!important;border:2px solid #f8fafc!important;border-radius:16px!important;outline:0!important;box-shadow:0 2px 0 rgba(255,255,255,.18),inset 0 0 0 1px rgba(148,163,184,.24)!important;font-size:16px!important;line-height:1.5!important}
 .st-key-api_key_input_box textarea:focus{border-color:#38d9f5!important;box-shadow:0 0 0 3px rgba(56,217,245,.20)!important}
+.st-key-home_api_notice{width:min(100%,760px)!important;margin:0 auto 10px!important}
+.st-key-home_api_notice .home-api-notice{display:flex;align-items:center;gap:8px;min-height:38px;box-sizing:border-box;padding:7px 12px;border:1px solid rgba(245,158,11,.55);border-radius:10px;background:rgba(55,48,16,.78);color:#d6a52b;font-size:13px;line-height:1.35;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.12)}
 .st-key-settings_drawer hr{border-color:#273650!important}
 .st-key-settings_drawer .stAlert{border-radius:14px!important}
 .settings-save-state{margin:0 0 12px!important;padding:9px 10px!important;border:1px solid rgba(45,212,191,.48)!important;border-radius:12px!important;background:rgba(16,185,129,.13)!important;color:#d1fae5!important;font-size:13px!important;font-weight:800!important;line-height:1.45!important}
@@ -3369,7 +3371,11 @@ provider_ready = bool(google_translate_api_key) if translation_provider == "Goog
 
 if not provider_ready:
     provider_name = "Google Cloud Translation API Key" if translation_provider == "Google Cloud Translation" else "Gemini API Key"
-    st.warning(f"🔐 មិនទាន់មាន {provider_name} — សូមកំណត់ក្នុង ⚙️ Settings ដើម្បីបកប្រែអក្សរទៅជាភាសាខ្មែរ។")
+    with st.container(key="home_api_notice"):
+        st.markdown(
+            f'<div class="home-api-notice">🔐 {html.escape(provider_name)} <span>— ⚙️ Settings</span></div>',
+            unsafe_allow_html=True,
+        )
 
 st.markdown(
     '<div class="hero"><h1>AI KHEMRA BRO</h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
