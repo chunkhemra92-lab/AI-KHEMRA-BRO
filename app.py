@@ -3252,6 +3252,10 @@ if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
     st.session_state.voice_mode = "Auto"
 if st.session_state.get("model_selector") not in GEMINI_TRANSLATION_MODEL_OPTIONS:
     st.session_state.model_selector = DEFAULT_GEMINI_TRANSLATION_MODEL
+# Translation provider/style controls are intentionally hidden; keep the original
+# Gemini + Natural behavior active so the customer workflow remains functional.
+st.session_state.translation_provider = "Gemini"
+st.session_state.translation_style = DEFAULT_TRANSLATION_STYLE
 
 if "settings_drawer_open" not in st.session_state:
     st.session_state.settings_drawer_open = False
@@ -3312,27 +3316,8 @@ if st.session_state.settings_drawer_open:
         else:
             st.warning("⚠️ សូមបញ្ចូល API Key ដើម្បីប្រើការបកប្រែ។")
         st.divider()
-
-        st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
-        st.radio(
-            "ជ្រើសរើស Translate API៖", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
-            format_func=lambda value: "🤖 Gemini API" if value == "Gemini" else "🌐 Google API",
-            on_change=account_settings_changed,
-        )
-        if st.session_state.translation_provider == "Google Cloud Translation":
-            st.text_input(
-                "Google Cloud Translation API Key", type="password", placeholder="AIza...",
-                key="google_translate_api_key", on_change=account_settings_changed,
-                help="បើក Cloud Translation API និង Billing ក្នុង Google Cloud មុនប្រើសោនេះ។",
-            )
-        st.radio(
-            "🎭 ជ្រើសរើសទម្រង់បកប្រែ", TRANSLATION_STYLE_OPTIONS, key="translation_style",
-            on_change=account_settings_changed,
-            help="ជ្រើសរើសទម្រង់សម្រាប់ការបកប្រែ។ Timestamp និងន័យដើមត្រូវបានរក្សាទុក។",
-        )
-
-        st.divider()
         st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
+
         st.radio(
             "កំណត់ល្បឿនសំឡេង៖", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
             format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
