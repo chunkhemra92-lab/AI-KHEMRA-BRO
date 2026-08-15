@@ -474,6 +474,11 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .settings-drawer-section{margin:16px 0 7px!important;color:#ffffff!important;font-size:19px!important;font-weight:900!important;line-height:1.25!important}
 .settings-drawer-section + p{color:#b9c5d7!important}
 .settings-account-name{margin:0 38px 8px 0!important;color:#ffffff!important;font-size:18px!important;font-weight:900!important;line-height:1.25!important;overflow-wrap:anywhere!important}
+.settings-profile-card{box-sizing:border-box!important;margin:0 0 14px!important;padding:18px 16px!important;border:2px solid #22d3ee!important;border-radius:22px!important;background:#131e30!important;box-shadow:0 10px 26px rgba(8,145,178,.18)!important;color:#f8fafc!important}
+.settings-profile-name{margin:0 0 13px!important;color:#ffffff!important;font-size:21px!important;font-weight:950!important;line-height:1.2!important;overflow-wrap:anywhere!important}
+.settings-profile-detail{margin:8px 0!important;color:#edf4fb!important;font-size:14px!important;font-weight:750!important;line-height:1.4!important;overflow-wrap:anywhere!important}
+.settings-profile-days{margin:11px 0 0!important;color:#ffffff!important;font-size:17px!important;font-weight:950!important;letter-spacing:.2px!important}
+.st-key-customer_logout button{min-height:52px!important;border:0!important;border-radius:12px!important;background:linear-gradient(135deg,#8b00f5,#df00ef)!important;box-shadow:0 8px 20px rgba(192,0,238,.26)!important;font-size:16px!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
@@ -2991,20 +2996,26 @@ with st.container(key="settings_drawer_toggle"):
 
 if st.session_state.settings_drawer_open:
     with st.container(key="settings_drawer"):
-        # Keep the customer identity and their private subscription timing first.
+        # Reference-style account card using only this authenticated Access Code's data.
         private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
         private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
         private_now = _utcnow()
         private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
         private_customer_name = str(dict(login_row).get("customer_name") or st.session_state.get("customer_name") or "Customer")
+        private_seconds_left = max(0, (private_expiry - private_now).total_seconds())
+        private_days_left = int((private_seconds_left + 86399) // 86400)
         st.markdown(
-            f'<p class="settings-account-name">👤 {html.escape(private_customer_name)}</p>',
+            f"""<div class="settings-profile-card">
+                <p class="settings-profile-name">👋 {html.escape(private_customer_name)}</p>
+                <p class="settings-profile-detail">🎫 PLAN: {html.escape(private_plan)}</p>
+                <p class="settings-profile-detail">📅 EXPIRY: {private_expiry.strftime("%Y-%m-%d")}</p>
+                <p class="settings-profile-days">⌛ {private_days_left} DAYS LEFT</p>
+            </div>""",
             unsafe_allow_html=True,
         )
-        render_private_subscription_countdown(private_expiry, private_plan)
         if not private_active:
             st.error("❌ កញ្ចប់បានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិ។")
-        if st.button("🚪 Logout", key="customer_logout", use_container_width=True):
+        if st.button("🚪 ចាកចេញ (Logout)", key="customer_logout", use_container_width=True):
             release_customer_session(st.session_state.get("customer_code", ""), current_token)
             _session_cookie_delete()
             clear_private_user_session()
@@ -3014,7 +3025,13 @@ if st.session_state.settings_drawer_open:
             ):
                 st.session_state.pop(key, None)
             st.rerun()
-
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">🌍 Target Language (ភាសាគោលដៅ)</h3>', unsafe_allow_html=True)
+        st.caption("ជ្រើសរើសភាសា (Select Language):")
+        st.selectbox(
+            "Target Language", ["Khmer (ខ្មែរ)"], key="target_language",
+            on_change=account_settings_changed, label_visibility="collapsed",
+        )
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
         st.caption("Paste Gemini API Keys (One per line)")
