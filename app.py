@@ -3502,6 +3502,60 @@ def release_customer_session(access_code, token, actor="customer"):
             _audit("customer_logout", actor, row["customer_name"])
 
 
+OWNER_HEALTH_EXPIRING_DAYS = 7
+
+
+def owner_health_summary():
+    """Return read-only operational metrics for the Owner Dashboard."""
+    now = _utcnow()
+    now_iso = _iso(now)
+    expiring_cutoff = _iso(now + datetime.timedelta(days=OWNER_HEALTH_EXPIRING_DAYS))
+    login_attempt_cutoff = _iso(now - datetime.timedelta(minutes=LOGIN_WINDOW_MINUTES))
+
+    with license_connection() as connection:
+        license_metrics = connection.execute(
+            """
+            SELECT
+                COUNT(*) AS total_licenses,
+                SUM(CASE WHEN is_active=1 AND expires_at>? THEN 1 ELSE 0 END) AS active_licenses,
+                SUM(CASE WHEN is_active=1 AND expires_at>? AND expires_at<=? THEN 1 ELSE 0 END) AS expiring_soon,
+                SUM(CASE WHEN is_active=0 OR expires_at<=? THEN 1 ELSE 0 END) AS needs_attention,
+                MAX(last_login_at) AS last_customer_login
+            FROM licenses
+            """,
+            (now_iso, now_iso, expiring_cutoff, now_iso),
+        ).fetchone()
+        failed_logins = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM login_attempts
+            WHERE attempted_at>=? AND success=0
+            """,
+            (login_attempt_cutoff,),
+        ).fetchone()["count"]
+
+    return {
+        "captured_at": now,
+        "total_licenses": int(license_metrics["total_licenses"] or 0),
+        "active_licenses": int(license_metrics["active_licenses"] or 0),
+        "expiring_soon": int(license_metrics["expiring_soon"] or 0),
+        "needs_attention": int(license_metrics["needs_attention"] or 0),
+        "failed_logins": int(failed_logins or 0),
+        "last_customer_login": license_metrics["last_customer_login"],
+        "server_api_key_count": len([line for line in load_secret_gemini_api_keys().splitlines() if line]),
+        "persistent_storage": PERSISTENT_DATA_DIRECTORY_CONFIGURED,
+    }
+
+
+def _health_login_label(last_customer_login):
+    if not last_customer_login:
+        return "No customer login yet"
+    try:
+        return _parse_iso(last_customer_login).astimezone().strftime("%d %b %H:%M")
+    except Exception:
+        return "Recorded"
+
+
 def license_rows(search_text=""):
     query = "SELECT * FROM licenses"
     params = []
@@ -3899,6 +3953,55 @@ def admin_dashboard():
             st.session_state.admin_gate_visible = False
             st.session_state.owner_click_count = 0
             st.rerun()
+
+    health = owner_health_summary()
+    st.markdown("## 📊 Dashboard Overview")
+    st.caption(
+        f"Live snapshot • {health['captured_at'].astimezone().strftime('%d %b %Y, %H:%M')} • "
+        f"Expiring soon means the next {OWNER_HEALTH_EXPIRING_DAYS} days"
+    )
+
+    overview_row_one = st.columns(4)
+    overview_row_one[0].metric("Total licenses", health["total_licenses"])
+    overview_row_one[1].metric("Active now", health["active_licenses"])
+    overview_row_one[2].metric("Expiring soon", health["expiring_soon"])
+    overview_row_one[3].metric("Needs attention", health["needs_attention"])
+
+    overview_row_two = st.columns(4)
+    overview_row_two[0].metric(
+        f"Failed logins ({LOGIN_WINDOW_MINUTES}m)", health["failed_logins"]
+    )
+    overview_row_two[1].metric("Last customer login", _health_login_label(health["last_customer_login"]))
+    overview_row_two[2].metric(
+        "App API keys",
+        f"Ready ({health['server_api_key_count']})" if health["server_api_key_count"] else "Missing",
+    )
+    overview_row_two[3].metric(
+        "License storage", "Persistent" if health["persistent_storage"] else "Local"
+    )
+
+    attention_messages = []
+    if not health["server_api_key_count"]:
+        attention_messages.append("No app API key is configured in private host settings.")
+    if not health["persistent_storage"]:
+        attention_messages.append("License storage is local; configure persistent storage before creating production access codes.")
+    if health["needs_attention"]:
+        attention_messages.append(f"{health['needs_attention']} license(s) are expired or disabled.")
+    if health["expiring_soon"]:
+        attention_messages.append(
+            f"{health['expiring_soon']} active license(s) expire within {OWNER_HEALTH_EXPIRING_DAYS} days."
+        )
+    if health["failed_logins"]:
+        attention_messages.append(
+            f"{health['failed_logins']} failed customer login attempt(s) were recorded in the last {LOGIN_WINDOW_MINUTES} minutes."
+        )
+
+    if attention_messages:
+        st.markdown("#### ⚠️ Needs attention")
+        for attention_message in attention_messages:
+            st.warning(attention_message)
+    else:
+        st.success("✅ All monitored health checks are currently clear.")
 
     st.markdown("## 💾 Persistent Access Code Storage")
     with st.expander("💾 Storage Status & Backup", expanded=False):
