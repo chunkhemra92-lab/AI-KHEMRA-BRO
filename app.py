@@ -471,7 +471,7 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 /* Private Settings drawer. This is an app-owned container, not a BaseWeb popover. */
 .settings-drawer-title{margin:0 0 6px!important;color:#ffffff!important;font-size:25px!important;font-weight:950!important}
 .settings-drawer-note{margin:0 0 16px!important;color:#aab7cb!important;font-size:13px!important;line-height:1.5!important}
-.settings-drawer-section{margin:20px 0 9px!important;color:#ffffff!important;font-size:19px!important;font-weight:900!important}
+.settings-drawer-section{margin:16px 0 7px!important;color:#ffffff!important;font-size:19px!important;font-weight:900!important;line-height:1.25!important}
 .settings-drawer-section + p{color:#b9c5d7!important}
 .settings-account-name{margin:0 38px 8px 0!important;color:#ffffff!important;font-size:18px!important;font-weight:900!important;line-height:1.25!important;overflow-wrap:anywhere!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
@@ -485,17 +485,17 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer hr{border-color:#273650!important}
 .st-key-settings_drawer .stAlert{border-radius:14px!important}
 .settings-save-state{margin:0 0 12px!important;padding:9px 10px!important;border:1px solid rgba(45,212,191,.48)!important;border-radius:12px!important;background:rgba(16,185,129,.13)!important;color:#d1fae5!important;font-size:13px!important;font-weight:800!important;line-height:1.45!important}
-.st-key-settings_drawer [data-testid="stRadio"]{gap:7px!important}
-.st-key-settings_drawer [data-testid="stRadio"] > div{gap:7px!important}
-.st-key-settings_drawer [data-testid="stRadio"] label{box-sizing:border-box!important;width:100%!important;min-height:42px!important;margin:0!important;padding:9px 10px!important;border:1px solid #34445e!important;border-radius:12px!important;background:#162136!important;transition:border-color .16s ease,background .16s ease,transform .16s ease!important}
-.st-key-settings_drawer [data-testid="stRadio"] label:has(input:checked){border-color:#2dd4f1!important;background:#12384b!important;box-shadow:0 0 0 1px rgba(45,212,241,.18),0 6px 15px rgba(6,182,212,.15)!important}
-.st-key-settings_drawer [data-testid="stRadio"] label:active{transform:scale(.985)!important}
+.st-key-settings_drawer [data-testid="stRadio"]{gap:3px!important}
+.st-key-settings_drawer [data-testid="stRadio"] > div{gap:3px!important}
+.st-key-settings_drawer [data-testid="stRadio"] label{box-sizing:border-box!important;width:auto!important;min-height:0!important;margin:0!important;padding:2px 0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;line-height:1.35!important}
+.st-key-settings_drawer [data-testid="stRadio"] label:has(input:checked){background:transparent!important;box-shadow:none!important}
+.st-key-settings_drawer [data-testid="stRadio"] label:active{transform:none!important}
 @media(max-width:700px){
   .st-key-settings_drawer{top:68px!important;left:12px!important;width:min(54vw,300px)!important;max-width:calc(100vw - 132px)!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;padding:18px 14px 32px!important;border-radius:20px!important}
   .settings-drawer-title{font-size:22px!important}
   .settings-drawer-section{font-size:17px!important}
-  .st-key-settings_drawer [data-testid="stWidgetLabel"] p,.st-key-settings_drawer label p{font-size:13px!important}
-  .st-key-settings_drawer [data-testid="stRadio"] label{font-size:13px!important}
+  .st-key-settings_drawer [data-testid="stWidgetLabel"] p{font-size:13px!important;margin-bottom:4px!important}
+  .st-key-settings_drawer [data-testid="stRadio"] label,.st-key-settings_drawer [data-testid="stRadio"] label p{font-size:15px!important}
 }
 
 
@@ -3048,31 +3048,28 @@ if st.session_state.settings_drawer_open:
         )
 
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🗣 Voice Mode</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="settings-drawer-section">🗣️ Voice Mode (ជ្រើសសំឡេង)</h3>', unsafe_allow_html=True)
         st.radio(
-            "🗣️ ជ្រើសរើសប្រភេទសំឡេង", VOICE_MODE_OPTIONS, key="voice_mode",
-            format_func=lambda value: {"Auto": "✨ Auto", "All Male": "👨 All Male", "All Female": "👩 All Female"}[value],
+            "កំណត់សំឡេង Tab 1 & Tab 2:", VOICE_MODE_OPTIONS, key="voice_mode",
+            format_func=lambda value: {"Auto": "Auto (ប្រុស/ស្រី តាម Tag)", "All Male": "All Male (ប្រុសទាំងអស់)", "All Female": "All Female (ស្រីទាំងអស់)"}[value],
             on_change=account_settings_changed,
             help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
         )
 
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🧠 Google AI Studio Model</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="settings-drawer-section">🧠 AI Model (ជ្រើស AI)</h3>', unsafe_allow_html=True)
         if st.session_state.translation_provider == "Gemini":
-            st.caption("ជ្រើសម៉ូដែល Google AI Studio សម្រាប់បកប្រែ។ ចុចម្តងដើម្បីរក្សាទុក និងប្រើពេលបកប្រែបន្ទាប់។")
             st.radio(
-                "🤖 ជ្រើសរើស Gemini Model",
+                "ជ្រើសរើសម៉ូដែល (Select Model):",
                 GEMINI_TRANSLATION_MODEL_OPTIONS,
                 key="model_selector",
-                format_func=lambda value: GEMINI_TRANSLATION_MODEL_LABELS[value],
+                format_func=lambda value: value,
                 on_change=account_settings_changed,
                 help="ម៉ូដែលដែលបានជ្រើសត្រូវបានផ្ញើទៅ Gemini API ជាមុន។ បើ API Key មិនគាំទ្រម៉ូដែលនោះ កម្មវិធីសាកម៉ូដែល Stable ផ្សេងដោយសុវត្ថិភាព។",
             )
-            st.caption("✅ ប្រើជាមួយ Gemini API Key ដែលបង្កើតពី Google AI Studio។")
         else:
             st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
         st.toggle("📶 4G Lite Mode", key="lite_mode", on_change=account_settings_changed)
-        st.caption("ការផ្លាស់ប្ដូរជម្រើសខាងលើត្រូវបានរក្សាទុកដោយស្វ័យប្រវត្តិ។")
 
 api_keys_text = st.session_state.get("api_keys_manager", "")
 valid_api_keys = [line.strip() for line in api_keys_text.splitlines() if line.strip()]
