@@ -3490,7 +3490,6 @@ with tab_video:
             st.success(workflow_notice)
         else:
             st.warning(workflow_notice)
-    st.caption("SRT នឹងចូលប្រអប់នេះដោយស្វ័យប្រវត្តិ ពេលដំណើរការដល់ 100%។ អ្នកអាចកែបានមុន Generate MP3។")
 
     pending_editor_update = st.session_state.pop("pending_editor_update", None)
     if pending_editor_update is not None:
@@ -3768,5 +3767,3 @@ with tab_text_speech:
             key="download_text_speech_mp3",
             use_container_width=True,
         )
-
-st.caption("AI-KHEMRA-BRO • Chinese Story Translation • Mobile-first")
