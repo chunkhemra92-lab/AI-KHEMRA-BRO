@@ -1030,8 +1030,10 @@ def delete_private_api_keys():
 
 
 def save_api_keys_from_manager():
-    """Persist the simple multiline manager automatically after its owner edits it."""
-    save_private_api_keys(st.session_state.get("api_keys_manager", ""))
+    """Persist the manager value before its conditional drawer widget disappears."""
+    value = st.session_state.get("api_keys_manager", "")
+    st.session_state["saved_api_keys_text"] = value
+    save_private_api_keys(value)
 
 
 
@@ -1265,7 +1267,7 @@ def account_settings_changed():
 
 
 def api_keys_changed():
-    save_private_api_keys(st.session_state.get("api_keys_manager", ""))
+    save_api_keys_from_manager()
 
 
 def clear_private_user_session(delete_saved_api=False):
@@ -1274,6 +1276,8 @@ def clear_private_user_session(delete_saved_api=False):
         delete_private_api_keys()
     for state_key in (
         "api_keys_manager",
+        "saved_api_keys_text",
+        "saved_api_keys_owner_code",
         "srt_text",
         "pending_srt",
         "audio_bytes",
@@ -3402,11 +3406,26 @@ if not login_ok:
 
 st.session_state.customer_session_token = current_token
 
-# Read this browser's saved key once per Streamlit session.
+# The Settings drawer is conditional. Streamlit removes widget state when the
+# drawer closes, so retain the encrypted account value in a non-widget key and
+# restore the widget from it whenever the drawer opens again.
+api_keys_owner_code = _current_customer_code()
+if st.session_state.get("saved_api_keys_owner_code") != api_keys_owner_code:
+    st.session_state.saved_api_keys_text = load_private_api_keys()
+    st.session_state.saved_api_keys_owner_code = api_keys_owner_code
+    st.session_state.pop("api_keys_manager", None)
+if "saved_api_keys_text" not in st.session_state:
+    st.session_state.saved_api_keys_text = load_private_api_keys()
+# Remove only expired keys before rendering the drawer. Any key without an
+# expiry remains visible until the customer explicitly deletes it.
+current_saved_key_text = _purge_expired_private_api_keys(
+    st.session_state.saved_api_keys_text
+)
+if current_saved_key_text != st.session_state.saved_api_keys_text:
+    st.session_state.saved_api_keys_text = current_saved_key_text
+    st.session_state.pop("api_keys_manager", None)
 if "api_keys_manager" not in st.session_state:
-    st.session_state.api_keys_manager = load_private_api_keys()
-# Never prefill a visible widget with saved secrets. The backend session keeps
-# keys only for processing; the connection input starts blank on every new session.
+    st.session_state.api_keys_manager = st.session_state.saved_api_keys_text
 if st.session_state.pop("clear_api_key_input_after_save", False):
     st.session_state.pop("gemini_key_to_add", None)
 if "gemini_key_to_add" not in st.session_state:
@@ -3532,7 +3551,9 @@ if st.session_state.settings_drawer_open:
         else:
             st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
 
-api_keys_text = st.session_state.get("api_keys_manager", "")
+api_keys_text = st.session_state.get(
+    "saved_api_keys_text", st.session_state.get("api_keys_manager", "")
+)
 valid_api_keys = active_private_api_keys(api_keys_text)
 api_key = valid_api_keys[0] if valid_api_keys else ""
 target_language = st.session_state.target_language
