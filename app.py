@@ -959,8 +959,8 @@ def _load_browser_api_cache():
 
 
 def load_private_api_keys():
-    """Load account encryption first, then the safe account-bound browser cache."""
-    account_keys = _load_api_keys_from_account()
+    """Load the durable account record first, then the safe browser fallback."""
+    account_keys = _purge_expired_private_api_keys(_load_api_keys_from_account())
     if account_keys:
         return account_keys
     browser_keys = _load_browser_api_cache()
@@ -992,11 +992,15 @@ def _save_api_keys_to_account(api_keys_text):
 
 
 def save_private_api_keys(api_keys_text):
-    """Encrypt in the account DB and keep only a short-lived encrypted browser cache."""
+    """Persist keys and their expiry metadata in the current Access Code account."""
     cleaned = "\n".join(
         line.strip() for line in str(api_keys_text or "").splitlines() if line.strip()
     )
     saved_to_account = _save_api_keys_to_account(cleaned)
+    if saved_to_account:
+        # New keys receive an empty expiry (persist indefinitely); existing
+        # metadata is matched by fingerprint and therefore keeps its expiry.
+        synchronized_api_key_metadata(cleaned, persist_missing=True)
     try:
         if cleaned and saved_to_account:
             cookie_manager.set(
@@ -1158,18 +1162,53 @@ def _key_is_current(record):
     try:
         return datetime.date.fromisoformat(expiry) >= _utcnow().date()
     except ValueError:
+        # Invalid or missing expiry is treated as no expiry, never as an
+        # accidental deletion condition.
         return True
 
 
-def active_private_api_keys(api_keys_text):
-    """Return only non-expired encrypted account keys for API calls."""
+def _purge_expired_private_api_keys(api_keys_text):
+    """Remove only keys whose stored expiry date has passed."""
     keys = _normalized_api_keys(api_keys_text)
+    if not keys:
+        return ""
     records = synchronized_api_key_metadata(api_keys_text, persist_missing=False)
     records_by_fingerprint = {record["fingerprint"]: record for record in records}
-    return [
-        api_key_value for api_key_value in keys
-        if _key_is_current(records_by_fingerprint.get(_api_key_fingerprint(api_key_value), {}))
+    active_keys = [
+        key for key in keys
+        if _key_is_current(records_by_fingerprint.get(_api_key_fingerprint(key), {}))
     ]
+    if len(active_keys) == len(keys):
+        return "\n".join(active_keys)
+
+    # Expiry is the only automatic removal path. Keep the account and browser
+    # cache synchronized so the expired key does not return on the next load.
+    remaining_text = "\n".join(active_keys)
+    _save_api_keys_to_account(remaining_text)
+    try:
+        if remaining_text:
+            cookie_manager.set(
+                API_BROWSER_CACHE_NAME,
+                encrypt_browser_api_cache(remaining_text),
+                expires_at=datetime.datetime.now() + datetime.timedelta(days=API_BROWSER_CACHE_TTL_DAYS),
+                key="refresh_account_bound_api_cache_after_expiry",
+            )
+        else:
+            cookie_manager.delete(API_BROWSER_CACHE_NAME, key="delete_expired_account_bound_api_cache")
+    except Exception:
+        pass
+    remaining_records = [
+        records_by_fingerprint[_api_key_fingerprint(key)]
+        for key in active_keys
+        if _api_key_fingerprint(key) in records_by_fingerprint
+    ]
+    _save_api_key_metadata(remaining_records)
+    return remaining_text
+
+
+def active_private_api_keys(api_keys_text):
+    """Return only non-expired account keys, removing expired ones durably."""
+    return _normalized_api_keys(_purge_expired_private_api_keys(api_keys_text))
 
 def _load_account_settings():
     """Load encrypted settings that belong only to the signed-in Access Code."""
