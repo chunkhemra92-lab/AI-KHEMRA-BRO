@@ -468,37 +468,6 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   .social-split a{font-size:15px}
 }
 
-/* Private Settings drawer. This is an app-owned container, not a BaseWeb popover. */
-.settings-drawer-title{margin:0 0 6px!important;color:#ffffff!important;font-size:25px!important;font-weight:950!important}
-.settings-drawer-note{margin:0 0 16px!important;color:#aab7cb!important;font-size:13px!important;line-height:1.5!important}
-.settings-drawer-section{margin:20px 0 9px!important;color:#ffffff!important;font-size:19px!important;font-weight:900!important}
-.settings-drawer-section + p{color:#b9c5d7!important}
-.settings-account-name{margin:0 38px 8px 0!important;color:#ffffff!important;font-size:18px!important;font-weight:900!important;line-height:1.25!important;overflow-wrap:anywhere!important}
-.st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
-.st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
-.st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
-.st-key-settings_drawer{position:fixed!important;top:68px!important;left:12px!important;z-index:1000000!important;width:min(380px,calc(100vw - 38px))!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;box-sizing:border-box!important;margin:0!important;padding:20px 18px 34px!important;overflow-y:auto!important;overscroll-behavior:contain!important;background:#0c1424!important;border:1px solid #23d7f2!important;border-radius:22px!important;box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;color:#f8fafc!important;scrollbar-width:thin;scrollbar-color:#38d9f5 #0c1424}
-.st-key-settings_drawer > div,.st-key-settings_drawer [data-testid="stVerticalBlock"],.st-key-settings_drawer [data-testid="stVerticalBlock"] > div{width:100%!important;min-width:0!important;background:transparent!important}
-.st-key-settings_drawer [data-testid="stMarkdownContainer"] p,.st-key-settings_drawer label,.st-key-settings_drawer label p,.st-key-settings_drawer [data-testid="stCaptionContainer"]{color:#f8fafc!important}
-.st-key-settings_drawer [data-baseweb="select"] > div,.st-key-settings_drawer input,.st-key-settings_drawer textarea{background:#202b3d!important;color:#ffffff!important;border-color:#dbe7f4!important}
-.st-key-settings_drawer textarea::placeholder,.st-key-settings_drawer input::placeholder{color:#abb9cc!important}
-.st-key-settings_drawer hr{border-color:#273650!important}
-.st-key-settings_drawer .stAlert{border-radius:14px!important}
-.settings-save-state{margin:0 0 12px!important;padding:9px 10px!important;border:1px solid rgba(45,212,191,.48)!important;border-radius:12px!important;background:rgba(16,185,129,.13)!important;color:#d1fae5!important;font-size:13px!important;font-weight:800!important;line-height:1.45!important}
-.st-key-settings_drawer [data-testid="stRadio"]{gap:7px!important}
-.st-key-settings_drawer [data-testid="stRadio"] > div{gap:7px!important}
-.st-key-settings_drawer [data-testid="stRadio"] label{box-sizing:border-box!important;width:100%!important;min-height:42px!important;margin:0!important;padding:9px 10px!important;border:1px solid #34445e!important;border-radius:12px!important;background:#162136!important;transition:border-color .16s ease,background .16s ease,transform .16s ease!important}
-.st-key-settings_drawer [data-testid="stRadio"] label:has(input:checked){border-color:#2dd4f1!important;background:#12384b!important;box-shadow:0 0 0 1px rgba(45,212,241,.18),0 6px 15px rgba(6,182,212,.15)!important}
-.st-key-settings_drawer [data-testid="stRadio"] label:active{transform:scale(.985)!important}
-@media(max-width:700px){
-  .st-key-settings_drawer{top:68px!important;left:12px!important;width:min(54vw,300px)!important;max-width:calc(100vw - 132px)!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;padding:18px 14px 32px!important;border-radius:20px!important}
-  .settings-drawer-title{font-size:22px!important}
-  .settings-drawer-section{font-size:17px!important}
-  .st-key-settings_drawer [data-testid="stWidgetLabel"] p,.st-key-settings_drawer label p{font-size:13px!important}
-  .st-key-settings_drawer [data-testid="stRadio"] label{font-size:13px!important}
-}
-
-
 </style>
 ''', unsafe_allow_html=True)
 
@@ -2981,122 +2950,9 @@ if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
 if st.session_state.get("model_selector") not in GEMINI_TRANSLATION_MODEL_OPTIONS:
     st.session_state.model_selector = DEFAULT_GEMINI_TRANSLATION_MODEL
 
-if "settings_drawer_open" not in st.session_state:
-    st.session_state.settings_drawer_open = False
-
-with st.container(key="settings_drawer_toggle"):
-    if st.button("⚙️", key="open_settings_drawer", help="Open or close Settings"):
-        st.session_state.settings_drawer_open = not st.session_state.settings_drawer_open
-        st.rerun()
-
-if st.session_state.settings_drawer_open:
-    with st.container(key="settings_drawer"):
-        # Keep the customer identity and their private subscription timing first.
-        private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
-        private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
-        private_now = _utcnow()
-        private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
-        private_customer_name = str(dict(login_row).get("customer_name") or st.session_state.get("customer_name") or "Customer")
-        st.markdown(
-            f'<p class="settings-account-name">👤 {html.escape(private_customer_name)}</p>',
-            unsafe_allow_html=True,
-        )
-        render_private_subscription_countdown(private_expiry, private_plan)
-        if not private_active:
-            st.error("❌ កញ្ចប់បានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិ។")
-        if st.button("🚪 Logout", key="customer_logout", use_container_width=True):
-            release_customer_session(st.session_state.get("customer_code", ""), current_token)
-            _session_cookie_delete()
-            clear_private_user_session()
-            for key in (
-                "customer_authenticated", "customer_name", "customer_code",
-                "customer_session_token", "settings_owner_code",
-            ):
-                st.session_state.pop(key, None)
-            st.rerun()
-
-        st.divider()
-        st.markdown('<h2 class="settings-drawer-title">⚙️ Settings</h2>', unsafe_allow_html=True)
-        st.markdown(
-            '<p class="settings-drawer-note">ចុចជម្រើសដែលអ្នកចង់ប្រើ។ កម្មវិធីរក្សាទុក និងអនុវត្តវាភ្លាមៗសម្រាប់ Access Code នេះ។</p>',
-            unsafe_allow_html=True,
-        )
-        if st.session_state.pop("settings_save_feedback", None) is True:
-            st.markdown('<p class="settings-save-state">✅ បានរក្សាទុកជម្រើសរបស់អ្នករួចរាល់។ វានឹងប្រើដោយស្វ័យប្រវត្តិពេលបកប្រែ ឬបង្កើតសំឡេង។</p>', unsafe_allow_html=True)
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
-        st.caption("សោត្រូវបានអ៊ិនគ្រីប និងចែករំលែកតែជាមួយទូរសព្ទដែលប្រើ Access Code ដូចគ្នា។")
-        st.text_area(
-            "Gemini API Keys", height=92, placeholder="AIza... (one key per line)",
-            key="api_keys_manager", label_visibility="collapsed",
-            help="បើសោមួយ quota ពេញ App នឹងសាកសោបន្ទាប់។",
-        )
-        if st.button("💾 Save Gemini Keys", key="save_api_keys", use_container_width=True):
-            entered_keys = [line.strip() for line in st.session_state.api_keys_manager.splitlines() if line.strip()]
-            if entered_keys:
-                save_private_api_keys(st.session_state.api_keys_manager)
-                st.success("✅ បានរក្សាទុក Gemini API Key សម្រាប់ Access Code នេះ។")
-            else:
-                st.warning("សូមបញ្ចូល Gemini API Key ជាមុន។")
-
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🎭 Translation</h3>', unsafe_allow_html=True)
-        st.selectbox(
-            "🌍 Target Language", ["Khmer (ខ្មែរ)"], key="target_language",
-            on_change=account_settings_changed,
-        )
-        st.radio(
-            "🧩 ជ្រើសរើស Translate API", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
-            format_func=lambda value: "🤖 Gemini API" if value == "Gemini" else "🌐 Google API",
-            on_change=account_settings_changed,
-        )
-        if st.session_state.translation_provider == "Google Cloud Translation":
-            st.text_input(
-                "Google Cloud Translation API Key", type="password", placeholder="AIza...",
-                key="google_translate_api_key", on_change=account_settings_changed,
-                help="បើក Cloud Translation API និង Billing ក្នុង Google Cloud មុនប្រើសោនេះ។",
-            )
-        st.radio(
-            "🎭 ជ្រើសរើសទម្រង់បកប្រែ", TRANSLATION_STYLE_OPTIONS, key="translation_style",
-            on_change=account_settings_changed,
-            help="ជ្រើសរើសទម្រង់សម្រាប់ការបកប្រែ។ Timestamp និងន័យដើមត្រូវបានរក្សាទុក។",
-        )
-
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
-        st.radio(
-            "🎚️ ជ្រើសរើសការកំណត់សំឡេង", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
-            format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
-            on_change=account_settings_changed,
-            help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
-        )
-
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🗣 Voice Mode</h3>', unsafe_allow_html=True)
-        st.radio(
-            "🗣️ ជ្រើសរើសប្រភេទសំឡេង", VOICE_MODE_OPTIONS, key="voice_mode",
-            format_func=lambda value: {"Auto": "✨ Auto", "All Male": "👨 All Male", "All Female": "👩 All Female"}[value],
-            on_change=account_settings_changed,
-            help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
-        )
-
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🧠 Google AI Studio Model</h3>', unsafe_allow_html=True)
-        if st.session_state.translation_provider == "Gemini":
-            st.caption("ជ្រើសម៉ូដែល Google AI Studio សម្រាប់បកប្រែ។ ចុចម្តងដើម្បីរក្សាទុក និងប្រើពេលបកប្រែបន្ទាប់។")
-            st.radio(
-                "🤖 ជ្រើសរើស Gemini Model",
-                GEMINI_TRANSLATION_MODEL_OPTIONS,
-                key="model_selector",
-                format_func=lambda value: GEMINI_TRANSLATION_MODEL_LABELS[value],
-                on_change=account_settings_changed,
-                help="ម៉ូដែលដែលបានជ្រើសត្រូវបានផ្ញើទៅ Gemini API ជាមុន។ បើ API Key មិនគាំទ្រម៉ូដែលនោះ កម្មវិធីសាកម៉ូដែល Stable ផ្សេងដោយសុវត្ថិភាព។",
-            )
-            st.caption("✅ ប្រើជាមួយ Gemini API Key ដែលបង្កើតពី Google AI Studio។")
-        else:
-            st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
-        st.toggle("📶 4G Lite Mode", key="lite_mode", on_change=account_settings_changed)
-        st.caption("ការផ្លាស់ប្ដូរជម្រើសខាងលើត្រូវបានរក្សាទុកដោយស្វ័យប្រវត្តិ។")
+# Customer preferences and encrypted API keys are loaded above from the private
+# Access Code account. The Settings interface is intentionally hidden from Home.
+# Saved values remain active in the translation and audio processing paths below.
 
 api_keys_text = st.session_state.get("api_keys_manager", "")
 valid_api_keys = [line.strip() for line in api_keys_text.splitlines() if line.strip()]
@@ -3113,7 +2969,7 @@ provider_ready = bool(google_translate_api_key) if translation_provider == "Goog
 
 if not provider_ready:
     provider_name = "Google Cloud Translation API Key" if translation_provider == "Google Cloud Translation" else "Gemini API Key"
-    st.warning(f"🔐 មិនទាន់មាន {provider_name} — សូមបញ្ចូលក្នុង ☰ Settings ដើម្បីបកប្រែអក្សរទៅជាភាសាខ្មែរ។")
+    st.warning(f"🔐 Access Code នេះមិនទាន់មាន {provider_name} សម្រាប់បកប្រែអក្សរទៅជាភាសាខ្មែរទេ។")
 
 st.markdown(
     '<div class="hero"><h1>AI KHEMRA BRO</h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
