@@ -751,7 +751,7 @@ ACCOUNT_SETTINGS_DEFAULTS = {
     "translation_provider": "Gemini",
     "google_translate_api_key": "",
     "model_selector": DEFAULT_GEMINI_TRANSLATION_MODEL,
-    "lite_mode": True,
+    "lite_mode": False,
     "audio_sync_mode": "Speed Up Only",
     "voice_mode": "Auto",
 }
@@ -3354,7 +3354,6 @@ if st.session_state.settings_drawer_open:
             )
         else:
             st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
-        st.toggle("📶 4G Lite Mode", key="lite_mode", on_change=account_settings_changed)
 
 api_keys_text = st.session_state.get("api_keys_manager", "")
 valid_api_keys = active_private_api_keys(api_keys_text)
@@ -3365,8 +3364,9 @@ google_translate_api_key = st.session_state.get("google_translate_api_key", "").
 audio_sync_mode = st.session_state.audio_sync_mode
 voice_mode = st.session_state.voice_mode
 model = st.session_state.model_selector
-lite_mode = st.session_state.lite_mode
-max_mb = 60 if lite_mode else 150
+lite_mode = False
+st.session_state.lite_mode = False
+max_mb = 150
 provider_ready = bool(google_translate_api_key) if translation_provider == "Google Cloud Translation" else bool(valid_api_keys)
 
 
