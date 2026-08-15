@@ -3016,13 +3016,27 @@ if st.session_state.settings_drawer_open:
             st.rerun()
 
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🎭 Translation</h3>', unsafe_allow_html=True)
-        st.selectbox(
-            "🌍 Target Language", ["Khmer (ខ្មែរ)"], key="target_language",
-            on_change=account_settings_changed,
+        st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
+        st.caption("Paste Gemini API Keys (One per line)")
+        st.text_area(
+            "Gemini API Keys", height=92, placeholder="AIza... (one key per line)",
+            key="api_keys_manager", label_visibility="collapsed",
+            help="បញ្ចូល Gemini API Key មួយក្នុងមួយជួរ។ សោត្រូវបានអ៊ិនគ្រីបតាម Access Code នេះ។",
         )
+        if st.button("💾 Save Gemini Keys", key="save_api_keys", use_container_width=True):
+            entered_keys = [line.strip() for line in st.session_state.api_keys_manager.splitlines() if line.strip()]
+            if entered_keys:
+                save_private_api_keys(st.session_state.api_keys_manager)
+                st.success("✅ បានរក្សាទុក Gemini API Key រួចរាល់។")
+            else:
+                st.warning("⚠️ សូមបញ្ចូល API Key មួយយ៉ាងហោចណាស់។")
+        if st.session_state.get("translation_provider", "Gemini") == "Gemini" and not [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]:
+            st.warning("⚠️ សូមបញ្ចូល Gemini API Key ដើម្បីប្រើការបកប្រែ។")
+
+        st.divider()
+        st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
         st.radio(
-            "🧩 ជ្រើសរើស Translate API", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
+            "ជ្រើសរើស Translate API៖", TRANSLATION_PROVIDER_OPTIONS, key="translation_provider",
             format_func=lambda value: "🤖 Gemini API" if value == "Gemini" else "🌐 Google API",
             on_change=account_settings_changed,
         )
@@ -3041,7 +3055,7 @@ if st.session_state.settings_drawer_open:
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
         st.radio(
-            "🎚️ ជ្រើសរើសការកំណត់សំឡេង", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
+            "កំណត់ល្បឿនសំឡេង៖", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
             format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
             on_change=account_settings_changed,
             help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
