@@ -3369,13 +3369,6 @@ lite_mode = st.session_state.lite_mode
 max_mb = 60 if lite_mode else 150
 provider_ready = bool(google_translate_api_key) if translation_provider == "Google Cloud Translation" else bool(valid_api_keys)
 
-if not provider_ready:
-    provider_name = "Google Cloud Translation API Key" if translation_provider == "Google Cloud Translation" else "Gemini API Key"
-    with st.container(key="home_api_notice"):
-        st.markdown(
-            f'<div class="home-api-notice">🔐 {html.escape(provider_name)} <span>— ⚙️ Settings</span></div>',
-            unsafe_allow_html=True,
-        )
 
 st.markdown(
     '<div class="hero"><h1>AI KHEMRA BRO</h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
