@@ -3639,15 +3639,16 @@ with tab_video:
                                 generated_srt = future.result()
                             notice = "✅ Khmer SRT បានបង្កើតរួចរាល់។"
                         except Exception as translation_exc:
-                            # Never discard Whisper output when Gemini quota/key fails.
-                            generated_srt = source_srt
+                            # Keep Source SRT separately for recovery, but never
+                            # present untranslated source text as a Khmer result.
+                            generated_srt = ""
                             notice = (
-                                "⚠️ Whisper បានបង្កើត Source SRT រួច ប៉ុន្តែអ្នកផ្ដល់សេវាបកប្រែមិនអាចប្រើបាន។ "
+                                "⚠️ បានរក្សាទុក Source SRT រួច។ Gemini API មិនអាចបកប្រែបាន៖ "
                                 + friendly_ai_error(translation_exc, len(valid_api_keys))
                             )
                     else:
-                        generated_srt = source_srt
-                        notice = "⚠️ បានបង្កើត Source SRT រួច។ ដាក់ API Key សម្រាប់អ្នកផ្ដល់សេវាដែលបានជ្រើសក្នុង Settings ដើម្បីបកប្រែទៅខ្មែរ។"
+                        generated_srt = ""
+                        notice = "⚠️ បានរក្សាទុក Source SRT រួច ប៉ុន្តែមិនមាន Gemini API Key ដែលអាចប្រើបានសម្រាប់បកប្រែ។ សូមដាក់ Key ពិតក្នុង Settings ហើយសាកម្ដងទៀត។"
 
                     st.session_state.srt_text = generated_srt
                     st.session_state.main_srt_editor = generated_srt
