@@ -576,7 +576,7 @@ def translation_style_instruction(style):
 def translation_prompt_for_style(style):
     return (
         TRANSLATE_PROMPT
-        + "\n\nSELECTED TRANSLATION STYLE (MANDATORY):\n"
+        + "\n\nSELECTED TRANSLATION STYLE (MANDATORY; override default tone guidance when different):\n"
         + translation_style_instruction(style)
     )
 
@@ -1355,7 +1355,7 @@ def _translate_batch_text_only(
 You are the Khmer subtitle translation engine for AI KHEMRA BRO.
 Translate every SOURCE line into Khmer for movie dubbing.
 
-SELECTED TRANSLATION STYLE (MANDATORY):
+SELECTED TRANSLATION STYLE (MANDATORY; override default tone guidance when different):
 {style_instructions}
 
 STRICT RULES:
