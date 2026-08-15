@@ -507,6 +507,10 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer [data-testid="stMarkdownContainer"] p,.st-key-settings_drawer label,.st-key-settings_drawer label p,.st-key-settings_drawer [data-testid="stCaptionContainer"]{color:#f8fafc!important}
 .st-key-settings_drawer [data-baseweb="select"] > div,.st-key-settings_drawer input,.st-key-settings_drawer textarea{background:#202b3d!important;color:#ffffff!important;border-color:#dbe7f4!important}
 .st-key-settings_drawer textarea::placeholder,.st-key-settings_drawer input::placeholder{color:#abb9cc!important}
+.st-key-api_key_input_box{display:block!important;width:100%!important;margin:7px 0 12px!important}
+.st-key-api_key_input_box [data-testid="stTextArea"],.st-key-api_key_input_box [data-baseweb="textarea"],.st-key-api_key_input_box textarea{display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;box-sizing:border-box!important}
+.st-key-api_key_input_box textarea{min-height:118px!important;height:118px!important;padding:12px!important;background:#202b3d!important;color:#ffffff!important;border:2px solid #f8fafc!important;border-radius:16px!important;outline:0!important;box-shadow:0 2px 0 rgba(255,255,255,.18),inset 0 0 0 1px rgba(148,163,184,.24)!important;font-size:16px!important;line-height:1.5!important}
+.st-key-api_key_input_box textarea:focus{border-color:#38d9f5!important;box-shadow:0 0 0 3px rgba(56,217,245,.20)!important}
 .st-key-settings_drawer hr{border-color:#273650!important}
 .st-key-settings_drawer .stAlert{border-radius:14px!important}
 .settings-save-state{margin:0 0 12px!important;padding:9px 10px!important;border:1px solid rgba(45,212,191,.48)!important;border-radius:12px!important;background:rgba(16,185,129,.13)!important;color:#d1fae5!important;font-size:13px!important;font-weight:800!important;line-height:1.45!important}
@@ -3306,10 +3310,11 @@ if st.session_state.settings_drawer_open:
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
         st.caption("Paste Gemini API Keys (One per line)")
-        st.text_area(
-            "Gemini API Keys", height=92, key="api_keys_manager", label_visibility="collapsed",
-            placeholder="AIza...", on_change=save_api_keys_from_manager,
-        )
+        with st.container(key="api_key_input_box"):
+            st.text_area(
+                "Gemini API Keys", height=118, key="api_keys_manager", label_visibility="collapsed",
+                placeholder="AIza...", on_change=save_api_keys_from_manager,
+            )
         simple_key_count = len(_normalized_api_keys(st.session_state.get("api_keys_manager", "")))
         if simple_key_count:
             st.success(f"✅ មាន {simple_key_count} Keys")
