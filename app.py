@@ -487,11 +487,18 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .settings-ai-vault-card{margin:0 0 12px!important;padding:14px!important;border:1px solid rgba(74,222,128,.42)!important;border-radius:16px!important;background:linear-gradient(135deg,rgba(20,83,45,.36),rgba(6,78,59,.20))!important}
 .settings-ai-vault-card strong{display:block!important;color:#dcfce7!important;font-size:15px!important;font-weight:950!important}
 .settings-ai-vault-card span{display:block!important;margin-top:5px!important;color:#bbf7d0!important;font-size:12px!important;font-weight:750!important;line-height:1.45!important}
+.vault-key-list-title{margin:14px 0 7px!important;color:#e2e8f0!important;font-size:14px!important;font-weight:950!important;letter-spacing:.2px!important}
+.vault-key-row{margin:7px 0!important;padding:10px 11px!important;border:1px solid rgba(100,116,139,.48)!important;border-radius:13px!important;background:rgba(30,41,59,.72)!important}
+.vault-key-row strong{display:block!important;color:#f8fafc!important;font-size:13px!important;font-weight:900!important;overflow-wrap:anywhere!important}
+.vault-key-row span{display:block!important;margin-top:4px!important;color:#b8c6d9!important;font-size:12px!important;font-weight:700!important;line-height:1.4!important;overflow-wrap:anywhere!important}
+.vault-key-row.active{border-color:rgba(34,197,94,.48)!important;background:rgba(20,83,45,.24)!important}
+.vault-key-row.expired{border-color:rgba(248,113,113,.52)!important;background:rgba(127,29,29,.20)!important}
 .st-key-add_gemini_key button{min-height:46px!important;border-radius:12px!important;background:linear-gradient(90deg,#0f766e,#22c55e)!important}
 .settings-ai-connection-banner span{display:block!important;margin-top:4px!important;color:#a5f3fc!important;font-size:12px!important;font-weight:700!important;line-height:1.4!important}
 .st-key-settings_drawer [data-testid="stTextArea"] textarea{min-height:92px!important;border-radius:14px!important;box-shadow:inset 0 0 0 1px rgba(148,163,184,.16)!important}
 .st-key-settings_drawer [data-testid="stSelectbox"] > div{border-radius:14px!important}
 .st-key-settings_drawer .stCaption{color:#b9c8dc!important;line-height:1.48!important}
+.st-key-main_srt_editor textarea,.st-key-translator_source textarea,.st-key-speech_srt_input textarea{min-height:300px!important;height:300px!important;border-radius:16px!important;background:#1c2a3d!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
@@ -708,6 +715,7 @@ def translation_prompt_for_style(style):
 TRANSLATION_PROVIDER_OPTIONS = ["Gemini", "Google Cloud Translation"]
 AUDIO_SYNC_OPTIONS = ["Speed Up Only", "Speed Up & Slow Down"]
 VOICE_MODE_OPTIONS = ["Auto", "All Male", "All Female"]
+SRT_INPUT_HEIGHT = 300
 
 # Stable text models from the Google AI Studio / Gemini API catalog. These values
 # are exact API endpoint identifiers, stored privately per Access Code.
@@ -942,6 +950,147 @@ def delete_private_api_keys():
     except Exception:
         pass
 
+
+
+def _normalized_api_keys(api_keys_text):
+    """Normalize and deduplicate API keys without ever rendering them to the UI."""
+    values = []
+    for line in str(api_keys_text or "").splitlines():
+        value = line.strip()
+        if value and value not in values:
+            values.append(value)
+    return values
+
+
+def _api_key_fingerprint(api_key):
+    """Generate a non-reversible identifier for per-key metadata mapping."""
+    return hmac.new(
+        raw_cookie_secret.encode("utf-8"),
+        str(api_key).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:24]
+
+def _masked_api_key_identifier(api_key):
+    """Show a safe reference for a key without exposing the credential itself."""
+    value = str(api_key or "").strip()
+    if len(value) <= 8:
+        return "••••••••"
+    return f"{value[:4]}…{value[-4:]}"
+
+
+def _load_api_key_metadata():
+    """Load encrypted per-key name/expiry metadata for the current Access Code."""
+    code = _current_customer_code()
+    if not code:
+        return []
+    try:
+        with license_connection() as connection:
+            row = connection.execute(
+                "SELECT saved_api_key_metadata_encrypted FROM licenses "
+                "WHERE access_code_hash=? OR access_code_display=?",
+                (_hash_code(code), code),
+            ).fetchone()
+        payload = decrypt_api_keys(row["saved_api_key_metadata_encrypted"] or "") if row else ""
+        parsed = json.loads(payload) if payload else []
+        if not isinstance(parsed, list):
+            return []
+        clean = []
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            fingerprint = str(item.get("fingerprint") or "").strip()
+            if not fingerprint:
+                continue
+            clean.append({
+                "fingerprint": fingerprint,
+                "name": str(item.get("name") or "").strip()[:80],
+                "expires_on": str(item.get("expires_on") or "").strip()[:10],
+                "added_at": str(item.get("added_at") or "").strip()[:40],
+            })
+        return clean
+    except Exception:
+        return []
+
+
+def _save_api_key_metadata(records):
+    """Encrypt and save name/expiry metadata without including raw keys."""
+    code = _current_customer_code()
+    if not code:
+        return False
+    normalized = []
+    seen = set()
+    for item in records or []:
+        fingerprint = str(item.get("fingerprint") or "").strip()
+        if not fingerprint or fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        normalized.append({
+            "fingerprint": fingerprint,
+            "name": str(item.get("name") or "").strip()[:80],
+            "expires_on": str(item.get("expires_on") or "").strip()[:10],
+            "added_at": str(item.get("added_at") or _utcnow().isoformat()).strip()[:40],
+        })
+    encrypted = encrypt_api_keys(json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))) if normalized else ""
+    try:
+        with license_connection() as connection:
+            connection.execute(
+                "UPDATE licenses SET saved_api_key_metadata_encrypted=? "
+                "WHERE access_code_hash=? OR access_code_display=?",
+                (encrypted, _hash_code(code), code),
+            )
+            connection.commit()
+        return True
+    except Exception:
+        return False
+
+
+def synchronized_api_key_metadata(api_keys_text, persist_missing=False):
+    """Return one metadata record per current key, matched only by fingerprint."""
+    keys = _normalized_api_keys(api_keys_text)
+    prior_records = _load_api_key_metadata()
+    prior_by_fingerprint = {record["fingerprint"]: record for record in prior_records}
+    records = []
+    changed = False
+    for position, api_key_value in enumerate(keys, start=1):
+        fingerprint = _api_key_fingerprint(api_key_value)
+        existing = prior_by_fingerprint.get(fingerprint)
+        if existing:
+            record = dict(existing)
+        else:
+            record = {
+                "fingerprint": fingerprint,
+                "name": f"Gemini Key {position}",
+                "expires_on": "",
+                "added_at": _utcnow().isoformat(),
+            }
+            changed = True
+        records.append(record)
+    if len(records) != len(prior_records):
+        changed = True
+    if persist_missing and changed:
+        _save_api_key_metadata(records)
+    return records
+
+
+def _key_is_current(record):
+    expiry = str(record.get("expires_on") or "").strip()
+    if not expiry:
+        return True
+    try:
+        return datetime.date.fromisoformat(expiry) >= _utcnow().date()
+    except ValueError:
+        return True
+
+
+def active_private_api_keys(api_keys_text):
+    """Return only non-expired encrypted account keys for API calls."""
+    keys = _normalized_api_keys(api_keys_text)
+    records = synchronized_api_key_metadata(api_keys_text, persist_missing=False)
+    records_by_fingerprint = {record["fingerprint"]: record for record in records}
+    return [
+        api_key_value for api_key_value in keys
+        if _key_is_current(records_by_fingerprint.get(_api_key_fingerprint(api_key_value), {}))
+    ]
 
 def _load_account_settings():
     """Load encrypted settings that belong only to the signed-in Access Code."""
@@ -1619,6 +1768,28 @@ def _candidate_gemini_models(selected_model):
             result.append(name)
     return result
 
+def test_gemini_vault_key(api_key_value, selected_model):
+    """Make one tiny user-triggered Gemini request without persisting raw errors."""
+    last_message = ""
+    for model_name in _candidate_gemini_models(selected_model):
+        try:
+            client = genai.Client(api_key=api_key_value)
+            response = gemini_generate_with_retry(
+                client,
+                model_name,
+                "Reply with exactly OK.",
+                attempts=1,
+            )
+            if response is not None:
+                return True, model_name, ""
+        except Exception as exc:
+            last_message = str(exc).upper()
+    if any(token in last_message for token in ("401", "403", "API KEY", "PERMISSION_DENIED")):
+        return False, "", "🔒 Key មិនត្រឹមត្រូវ ឬមិនមានសិទ្ធិ"
+    if any(token in last_message for token in ("429", "RESOURCE_EXHAUSTED", "RATE LIMIT")):
+        return False, "", "⏳ Key មានសិទ្ធិ ប៉ុន្តែ Quota/Rate limit ពេញ"
+    return False, "", "❌ មិនអាចភ្ជាប់ Gemini API បាន"
+
 
 def _translate_batch_text_only(
     client, model_name, batch, previous_context="", translation_style=DEFAULT_TRANSLATION_STYLE
@@ -2261,6 +2432,7 @@ def initialize_license_database():
         _ensure_column(connection, "licenses", "active_session_last_seen", "TEXT")
         _ensure_column(connection, "licenses", "created_card_until", "TEXT")
         _ensure_column(connection, "licenses", "saved_api_keys_encrypted", "TEXT")
+        _ensure_column(connection, "licenses", "saved_api_key_metadata_encrypted", "TEXT")
         _ensure_column(connection, "licenses", "saved_settings_encrypted", "TEXT")
         _ensure_column(connection, "licenses", "plan_label", "TEXT")
         old_columns = {row["name"] for row in connection.execute("PRAGMA table_info(licenses)")}
@@ -3122,49 +3294,67 @@ if st.session_state.settings_drawer_open:
             on_change=account_settings_changed, label_visibility="collapsed",
         )
         st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🔐 AI Studio Key Vault</h3>', unsafe_allow_html=True)
-        saved_gemini_keys = [line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()]
-        st.markdown(
-            f'<div class="settings-ai-vault-card"><strong>🛡️ Encrypted Account Vault</strong><span>បានរក្សាទុក <b>{len(saved_gemini_keys)}</b> Gemini API Key ជាអ៊ិនគ្រីប។ Key ពិតមិនអាចមើល ឬចម្លងត្រឡប់ពីផ្ទាំងនេះបានទេ។</span></div>',
-            unsafe_allow_html=True,
-        )
-        st.caption("ប្រើសម្រាប់ Gemini API ពី Google AI Studio — មិនមែន Google Assistant។")
-        st.link_button(
-            "🌐 បង្កើត Gemini API Key ក្នុង Google AI Studio",
-            "https://aistudio.google.com/apikey",
-            use_container_width=True,
-            key="google_ai_studio_link",
-        )
-        st.caption("បង្កើត API Key ក្នុង AI Studio រួចបិទភ្ជាប់មួយសោម្តង។")
-        st.text_input(
-            "Add Gemini API Key", type="password", placeholder="AIza...",
-            key="gemini_key_to_add", label_visibility="collapsed",
-            help="អក្សរត្រូវបានបិទបាំងខណៈពេលវាយ ហើយត្រូវបានលុបចេញពីប្រអប់ភ្លាមក្រោយការរក្សាទុក។",
-        )
-        if st.button("➕ Encrypt & Add Key", key="add_gemini_key", use_container_width=True):
+        st.markdown('<h3 class="settings-drawer-section">🔐 AI Studio Keys</h3>', unsafe_allow_html=True)
+        saved_gemini_keys = _normalized_api_keys(st.session_state.get("api_keys_manager", ""))
+        st.link_button("➕ AI Studio", "https://aistudio.google.com/apikey", use_container_width=True, key="google_ai_studio_link")
+        st.text_input("API Key", type="password", placeholder="AIza...", key="gemini_key_to_add", label_visibility="collapsed")
+        if st.button("➕ Add Key", key="add_gemini_key", use_container_width=True):
             new_key = str(st.session_state.get("gemini_key_to_add", "")).strip()
             if new_key:
-                merged_keys = []
-                for candidate in saved_gemini_keys + [new_key]:
-                    if candidate not in merged_keys:
-                        merged_keys.append(candidate)
+                merged_keys = _normalized_api_keys("\n".join(saved_gemini_keys + [new_key]))
                 protected_keys = "\n".join(merged_keys)
                 if save_private_api_keys(protected_keys):
                     st.session_state.api_keys_manager = protected_keys
+                    synchronized_api_key_metadata(protected_keys, persist_missing=True)
                     st.session_state.clear_api_key_input_after_save = True
-                    st.session_state.api_key_saved_feedback = len(merged_keys)
                     st.rerun()
                 else:
-                    st.error("❌ មិនអាចរក្សាទុក Gemini API Key បានទេ។ សូមសាកម្ដងទៀត។")
-            else:
-                st.warning("⚠️ សូមបិទភ្ជាប់ Gemini API Key ជាមុន។")
-        saved_feedback_count = st.session_state.pop("api_key_saved_feedback", None)
-        if saved_feedback_count:
-            st.success(f"✅ បានអ៊ិនគ្រីប និងរក្សាទុក {saved_feedback_count} Gemini API Key រួចរាល់។")
+                    st.error("❌ មិនអាចរក្សាទុកបាន")
+        key_metadata = synchronized_api_key_metadata("\n".join(saved_gemini_keys), persist_missing=bool(saved_gemini_keys))
         if saved_gemini_keys:
-            st.markdown(f'<p class="google-ai-studio-status">✅ AI Studio Vault សកម្ម។ Browser cache ត្រូវបានអ៊ិនគ្រីប និងភ្ជាប់តែជាមួយ Access Code នេះ។</p>', unsafe_allow_html=True)
-        else:
-            st.warning("⚠️ មិនទាន់មាន Gemini API Key ក្នុង Vault ទេ។")
+            st.markdown(f'<p class="vault-key-list-title">📁 Keys ({len(saved_gemini_keys)})</p>', unsafe_allow_html=True)
+            for raw_key_value, record in zip(saved_gemini_keys, key_metadata):
+                fingerprint = record["fingerprint"]
+                name_widget = f"vault_key_name_{fingerprint}"
+                expiry_widget = f"vault_key_expiry_{fingerprint}"
+                if name_widget not in st.session_state:
+                    st.session_state[name_widget] = record.get("name") or "Gemini Key"
+                if expiry_widget not in st.session_state:
+                    try:
+                        st.session_state[expiry_widget] = datetime.date.fromisoformat(record["expires_on"]) if record.get("expires_on") else None
+                    except ValueError:
+                        st.session_state[expiry_widget] = None
+                st.markdown('<div class="vault-key-row active">', unsafe_allow_html=True)
+                st.code(raw_key_value, language=None)
+                meta_col, expiry_col = st.columns([1, 1], gap="small")
+                with meta_col:
+                    st.text_input("Name", key=name_widget, max_chars=80, label_visibility="collapsed")
+                with expiry_col:
+                    st.date_input("Expire", key=expiry_widget, value=None, label_visibility="collapsed")
+                test_col, save_col = st.columns([1, 1], gap="small")
+                with test_col:
+                    if st.button("🔌 Test", key=f"test_vault_key_{fingerprint}", use_container_width=True):
+                        with st.spinner("Testing..."):
+                            test_ok, tested_model, test_message = test_gemini_vault_key(
+                                raw_key_value,
+                                st.session_state.get("model_selector", DEFAULT_GEMINI_TRANSLATION_MODEL),
+                            )
+                        if test_ok:
+                            st.success(f"✅ {tested_model}")
+                        else:
+                            st.error(test_message)
+                with save_col:
+                    if st.button("💾 Save", key=f"save_vault_key_metadata_{fingerprint}", use_container_width=True):
+                        chosen_expiry = st.session_state.get(expiry_widget)
+                        for editable_record in key_metadata:
+                            if editable_record["fingerprint"] == fingerprint:
+                                editable_record["name"] = str(st.session_state.get(name_widget) or "Gemini Key").strip()[:80] or "Gemini Key"
+                                editable_record["expires_on"] = chosen_expiry.isoformat() if isinstance(chosen_expiry, datetime.date) else ""
+                        if _save_api_key_metadata(key_metadata):
+                            st.rerun()
+                        else:
+                            st.error("❌ មិនអាចរក្សាទុកបាន")
+                st.markdown('</div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🎭 Translation Style</h3>', unsafe_allow_html=True)
@@ -3219,7 +3409,7 @@ if st.session_state.settings_drawer_open:
         st.toggle("📶 4G Lite Mode", key="lite_mode", on_change=account_settings_changed)
 
 api_keys_text = st.session_state.get("api_keys_manager", "")
-valid_api_keys = [line.strip() for line in api_keys_text.splitlines() if line.strip()]
+valid_api_keys = active_private_api_keys(api_keys_text)
 api_key = valid_api_keys[0] if valid_api_keys else ""
 translation_style = st.session_state.translation_style
 translation_provider = st.session_state.translation_provider
@@ -3367,7 +3557,7 @@ with tab_video:
 
     st.text_area(
         "SRT Editor",
-        height=360,
+        height=SRT_INPUT_HEIGHT,
         label_visibility="collapsed",
         key="main_srt_editor",
     )
@@ -3526,7 +3716,7 @@ with tab_video:
 with tab_translate:
     st.header("AI Subtitle Translator")
     st.info("បិទភ្ជាប់ Chinese SRT ហើយបកប្រែទៅ Khmer SRT ជាភាសាខ្មែរធម្មជាតិ ស្អាតសម្រាប់ទស្សនិកជនទូទៅ និងរក្សា timestamp ដើម។")
-    source_srt = st.text_area("Chinese SRT", height=300, key="translator_source")
+    source_srt = st.text_area("Chinese SRT", height=SRT_INPUT_HEIGHT, key="translator_source")
     if st.button("🌐 Translate to Khmer", key="translate_btn"):
         if not source_srt.strip():
             st.warning("សូមបញ្ចូល Chinese SRT។")
@@ -3575,7 +3765,7 @@ with tab_srt_speech:
     st.header("SRT → Speech")
     speech_srt = st.text_area(
         "Khmer SRT with [BOY] [GIRL] [M_YOUNG] [F_YOUNG] [M_ADULT] [F_ADULT] [M_OLD] [F_OLD] [M_THINK] [F_THINK] [NARRATOR_M] [NARRATOR_F]",
-        height=360,
+        height=SRT_INPUT_HEIGHT,
         key="speech_srt_input",
     )
     if st.button("🎧 Create MP3", key="srt_to_speech_btn"):
