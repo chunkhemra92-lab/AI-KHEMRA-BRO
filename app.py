@@ -3,6 +3,7 @@ import base64
 import threading
 from contextlib import contextmanager
 import datetime
+import html
 import hashlib
 import hmac
 import os
@@ -35,7 +36,7 @@ except Exception as whisper_import_error:
     WhisperModel = None
     FASTER_WHISPER_IMPORT_ERROR = str(whisper_import_error)
 
-APP_VERSION = "6.7.12"
+APP_VERSION = "6.7.14"
 
 # Resource safeguards for a shared Streamlit server. These limits protect CPU and
 # RAM during the two expensive paths: video ASR and FFmpeg/Edge-TTS MP3 creation.
@@ -254,6 +255,16 @@ div[data-baseweb="popover"] [data-testid="stExpander"] summary{min-height:52px!i
   border-radius:11px;background:rgba(14,165,233,.09);color:#dff8ff;
   font-size:13px;font-weight:750;line-height:1.42;
 }
+.controller-profile{
+  margin:12px 0 3px;padding:14px 13px;border:1px solid #40dff5;
+  border-radius:14px;background:linear-gradient(135deg,#121f31,#0b1423);
+  color:#f8fafc;box-shadow:0 0 18px rgba(34,211,238,.13);
+}
+.controller-profile-title{color:#67e8f9;font-size:12px;font-weight:900;letter-spacing:.9px;margin-bottom:7px}
+.controller-profile-name{font-size:19px;font-weight:900;line-height:1.18;margin-bottom:7px}
+.controller-profile-line{color:#dbeafe;font-size:13px;font-weight:720;line-height:1.5}
+.st-key-controller_logout{margin:4px 12px 2px!important}
+.st-key-controller_logout .stButton button{min-height:44px!important;background:linear-gradient(90deg,#8b1bb5,#d946ef)!important;font-weight:900!important}
 .controller-section{
   margin:10px 12px 0;padding:11px 0 0;border-top:1px solid rgba(71,85,105,.56);
   color:#e8f6ff;font-size:14px;font-weight:900;letter-spacing:.2px;
@@ -832,6 +843,14 @@ TAG_ALIASES = {
     "F": "F", "F_ADULT": "F", "F_YOUNG": "F", "F_OLD": "F", "GIRL": "F", "OLD_F": "F", "NARRATOR_F": "F",
     "M_THINK": "M_THINK", "F_THINK": "F_THINK",
 }
+# One explicit lock for every supported output tag.  This table is deliberately
+# separate from UI labels: every TTS path validates it before choosing a voice.
+VOICE_TAG_LOCKS = {
+    "M": {"gender": "male", "mode": "dialogue", "thought": False},
+    "F": {"gender": "female", "mode": "dialogue", "thought": False},
+    "M_THINK": {"gender": "male", "mode": "inner thought", "thought": True},
+    "F_THINK": {"gender": "female", "mode": "inner thought", "thought": True},
+}
 NON_KHMER_SCRIPT_RE = re.compile(
     r"[A-Za-z\u00C0-\u024F\u0E00-\u0E7F\u3040-\u30FF\u3100-\u312F\u3130-\uD7AF"
     r"\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]"
@@ -919,8 +938,34 @@ PROCESSING_MODE_LABELS = {
 
 
 def normalize_voice_tag(tag):
-    """Return one of the four approved Khmer dubbing tags."""
+    """Return a canonical tag for trusted internal/UI values; legacy aliases remain supported."""
     return TAG_ALIASES.get(str(tag or "M").upper().strip(), "M")
+
+
+def lock_voice_tag(tag, cue_id=None, require_explicit=False):
+    """Validate and lock a subtitle tag before it can select a TTS voice.
+
+    SRT-to-speech requires an explicit supported tag on every cue.  Invalid or
+    missing tags raise a clear error instead of silently becoming male dialogue.
+    Legacy tags are converted only through TAG_ALIASES, then locked to one of
+    the four supported production tags.
+    """
+    raw = str(tag or "").strip().upper().strip("[]")
+    if not raw:
+        if require_explicit:
+            where = f" in cue {cue_id}" if cue_id is not None else ""
+            raise ValueError(
+                f"Missing voice tag{where}. Start every SRT dialogue line with "
+                "[M], [F], [M_THINK], or [F_THINK]."
+            )
+        raw = "M"
+    canonical = TAG_ALIASES.get(raw)
+    if canonical not in VOICE_TAG_LOCKS:
+        where = f" in cue {cue_id}" if cue_id is not None else ""
+        raise ValueError(
+            f"Invalid voice tag [{raw}]{where}. Use only [M], [F], [M_THINK], or [F_THINK]."
+        )
+    return canonical
 
 
 def contains_non_khmer_script(text):
@@ -948,11 +993,13 @@ def is_valid_target_dialogue(text, target_language):
 
 
 def voice_profile_for_target_language(tag, target_language):
-    """Use the selected language's matching male/female voice with the role's gentle tuning."""
-    canonical_tag = normalize_voice_tag(tag)
-    profile = dict(VOICE_PROFILES.get(canonical_tag, VOICE_PROFILES["M"]))
+    """Return the one locked TTS profile permitted for the supplied canonical tag."""
+    canonical_tag = lock_voice_tag(tag, require_explicit=True)
+    lock = VOICE_TAG_LOCKS[canonical_tag]
+    profile = dict(VOICE_PROFILES[canonical_tag])
     settings = target_language_settings(target_language)
-    profile["voice"] = settings["female_voice"] if canonical_tag.startswith("F") else settings["male_voice"]
+    profile["voice"] = settings["female_voice"] if lock["gender"] == "female" else settings["male_voice"]
+    profile["locked_tag"] = canonical_tag
     return profile
 
 
@@ -2557,9 +2604,11 @@ def analyze_inner_thoughts(srt_text, api_keys, selected_model, video_path=None):
                 raise RuntimeError(friendly_ai_error(exc, len(api_keys))) from exc
     raise RuntimeError(friendly_ai_error(last_error, len(api_keys)))
 
-def parse_srt(srt_text):
+def parse_srt(srt_text, require_explicit_tags=False):
     time_re=re.compile(r'(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})')
-    tag_re=re.compile(r'^\[(BOY|GIRL|M_YOUNG|F_YOUNG|M_ADULT|F_ADULT|M_OLD|F_OLD|M_THINK|F_THINK|NARRATOR_M|NARRATOR_F|M|F|OLD_M|OLD_F)\]\s*',re.I)
+    # Read any leading bracket tag, then validate it through lock_voice_tag.
+    # This prevents an unknown tag from silently rendering as the male voice.
+    tag_re=re.compile(r'^\[([^\]\r\n]+)\]\s*', re.I)
     def to_ms(v):
         h,m,s,ms=map(int,v); return ((h*60+m)*60+s)*1000+ms
     cues=[]
@@ -2575,7 +2624,10 @@ def parse_srt(srt_text):
         if idx > 0 and lines[0].isdigit():
             cue_id = int(lines[0])
         dialogue=' '.join(lines[idx+1:]).strip(); tag_match=tag_re.match(dialogue)
-        tag=tag_match.group(1).upper() if tag_match else 'M'
+        raw_tag=tag_match.group(1).upper().strip() if tag_match else ''
+        # Translation can accept ordinary source SRT without tags.  MP3 creation
+        # passes require_explicit_tags=True and therefore rejects untagged audio.
+        tag=lock_voice_tag(raw_tag, cue_id=cue_id, require_explicit=require_explicit_tags)
         if tag_match:
             dialogue=dialogue[tag_match.end():].strip()
         if dialogue:
@@ -2705,8 +2757,8 @@ def character_voice_filters(tag):
 
 
 def voice_tone_filters(tag):
-    """Return the common gentle cleanup chain used by every generated MP3."""
-    canonical_tag = normalize_voice_tag(tag)
+    """Return the common gentle cleanup chain used by every locked TTS tag."""
+    canonical_tag = lock_voice_tag(tag, require_explicit=True)
     return [
         # Keep the TTS tone open. Excessive equalizers/compressors can make Khmer
         # consonants dull or cause each short cue to sound like a separate recording.
@@ -2803,7 +2855,9 @@ def create_mp3(srt_text, progress_callback=None, background_music_path=None, duc
     - Breathy high frequencies are reduced without making speech muddy.
     - Loudness is mastered once at the end instead of aggressively per clip.
     """
-    cues = parse_srt(srt_text)
+    # Dubbing has a stricter contract than translation: every cue must explicitly
+    # identify one canonical speaker tag before it can generate any audio.
+    cues = parse_srt(srt_text, require_explicit_tags=True)
     if not cues:
         raise ValueError('No valid SRT with timestamps was found.')
 
@@ -2817,8 +2871,10 @@ def create_mp3(srt_text, progress_callback=None, background_music_path=None, duc
             f'SRT does not match the selected target language in cue(s): {invalid_rows[:20]}. '
             'Translate the SRT again before creating MP3.'
         )
+    # Defense in depth: parsing already validates tags, and render validates again
+    # so no code path can send a cue to a voice without a locked canonical tag.
     for cue in cues:
-        cue['tag'] = normalize_voice_tag(cue.get('tag', 'M'))
+        cue['tag'] = lock_voice_tag(cue.get('tag', ''), cue_id=cue.get('id'), require_explicit=True)
     render_cues = coalesce_continuation_cues(cues)
 
     with reserve_heavy_job_slot("MP3 creation"):
@@ -2960,7 +3016,7 @@ def create_mp3(srt_text, progress_callback=None, background_music_path=None, duc
 
 def create_single_voice_mp3(text, tag, background_music_path=None, ducking_config=None, target_language="Khmer (ខ្មែរ)"):
     """Create a standalone MP3 inside the shared media slot to protect server resources."""
-    canonical_tag = normalize_voice_tag(tag)
+    canonical_tag = lock_voice_tag(tag, require_explicit=True)
     selected_target = normalized_target_language(target_language)
     if not is_valid_target_dialogue(text, selected_target):
         raise ValueError("The text does not match the selected target language.")
@@ -4079,31 +4135,25 @@ else:
         private_now = _utcnow()
         private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
         remaining_days = max(0, int((private_expiry - private_now).total_seconds() // 86400) + 1)
+        customer_display_name = html.escape(str(login_row["customer_name"] or "Customer"))
+        access_display = html.escape(str(login_row["access_code_display"] or ""))
+        plan_date = private_expiry.strftime("%Y-%m-%d")
         st.markdown(
-            f'<div class="controller-status">💳 STATUS: {private_plan} &nbsp;•&nbsp; ⏳ {remaining_days} day(s) remaining</div>',
+            f'<div class="controller-profile">'
+            f'<div class="controller-profile-title">👋 ACCOUNT PROFILE</div>'
+            f'<div class="controller-profile-name">{customer_display_name}</div>'
+            f'<div class="controller-profile-line">ROLE: Customer &nbsp;•&nbsp; CODE: {access_display}</div>'
+            f'<div class="controller-profile-line">🗓️ PLAN: {html.escape(private_plan)} until {plan_date}</div>'
+            f'<div class="controller-profile-line">⌛ {remaining_days} DAY(S) LEFT</div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
+        with st.container(key="controller_logout"):
+            logout_requested = st.button("🚪 Log out", key="customer_logout", use_container_width=True)
         if not private_active:
             st.error("❌ Your plan has expired. Contact the owner to renew access.")
 
-        st.markdown('<div class="controller-section">🤖 GEMINI MODEL</div>', unsafe_allow_html=True)
-        st.radio(
-            "Gemini Model",
-            GEMINI_MODEL_OPTIONS,
-            key="model_selector",
-            label_visibility="collapsed",
-            format_func=lambda item: {
-                "gemini-3.7-flash": "🔥 3.7 Flash • Best",
-                "gemini-3.6-flash": "⚡ 3.6 Flash",
-                "gemini-3.5-flash": "🚀 3.5 Flash",
-                "gemini-3.5-flash-lite": "💡 3.5 Lite",
-                "gemini-3.1-flash-lite": "✨ 3.1 Lite",
-                "gemini-3.1-pro-preview": "🧠 3.1 Pro",
-            }.get(item, item),
-            help="Select the Gemini model used for translation.",
-        )
-
-        st.markdown('<div class="controller-section">🎯 TARGET LANGUAGE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="controller-section">🌐 TARGET LANGUAGE</div>', unsafe_allow_html=True)
         st.radio(
             "Target Language",
             TARGET_LANGUAGE_OPTIONS,
@@ -4117,7 +4167,25 @@ else:
             help="Choose the output language for subtitles and MP3 audio.",
         )
 
-        st.markdown('<div class="controller-section">🎭 STYLE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="controller-section">🔑 API KEYS MANAGER</div>', unsafe_allow_html=True)
+        st.caption("Paste one or more Gemini keys below. Your keys remain encrypted and private to this browser.")
+        st.text_area(
+            "Gemini API Key",
+            height=92,
+            placeholder="AIza...",
+            key="api_keys_manager",
+            label_visibility="collapsed",
+            help="If one key reaches quota, the app automatically tries the next eligible key.",
+        )
+        current_keys = [
+            line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()
+        ]
+        if current_keys:
+            st.caption(f"✅ API keys ready: {len(current_keys)}")
+        else:
+            st.caption("No private Gemini API key saved yet.")
+
+        st.markdown('<div class="controller-section">🎭 TRANSLATION STYLE</div>', unsafe_allow_html=True)
         st.radio(
             "Translation Style",
             TRANSLATION_STYLE_OPTIONS,
@@ -4148,32 +4216,36 @@ else:
             key="workflow_mode",
             format_func=lambda item: WORKFLOW_MODE_LABELS.get(item, item),
         )
-        st.selectbox(
-            "⚙️ Processing Mode",
+        st.markdown('<div class="controller-section">⚙️ AUDIO SYNC MODE</div>', unsafe_allow_html=True)
+        st.radio(
+            "Audio Sync Mode",
             ["⚡ លឿន (ណែនាំ)", "🎚️ សំឡេងច្បាស់ (យឺតជាង)"],
             key="processing_mode",
+            label_visibility="collapsed",
             format_func=lambda item: PROCESSING_MODE_LABELS.get(item, item),
+            help="Fast Mode shortens processing time; Higher Accuracy Mode uses more careful media processing.",
         )
         st.toggle("📶 4G Lite Mode", key="lite_mode")
 
-        st.markdown('<div class="controller-section">🔑 API KEY</div>', unsafe_allow_html=True)
-        st.caption("Paste one or more Gemini keys below. Your keys remain encrypted and private to this browser.")
-        st.text_area(
-            "Gemini API Key",
-            height=92,
-            placeholder="AIza...",
-            key="api_keys_manager",
-            label_visibility="collapsed",
-            help="If one key reaches quota, the app automatically tries the next eligible key.",
-        )
+        st.markdown('<div class="controller-section">🗣️ VOICE MODE</div>', unsafe_allow_html=True)
+        st.caption("Automatic speaker tags are active: [M], [F], [M_THINK], and [F_THINK]. Inner thoughts are rendered at 60% volume.")
 
-        current_keys = [
-            line.strip() for line in st.session_state.get("api_keys_manager", "").splitlines() if line.strip()
-        ]
-        if current_keys:
-            st.caption(f"✅ API keys ready: {len(current_keys)}")
-        else:
-            st.caption("No private Gemini API key saved yet.")
+        st.markdown('<div class="controller-section">🧠 AI MODEL</div>', unsafe_allow_html=True)
+        st.radio(
+            "Gemini Model",
+            GEMINI_MODEL_OPTIONS,
+            key="model_selector",
+            label_visibility="collapsed",
+            format_func=lambda item: {
+                "gemini-3.7-flash": "🔥 3.7 Flash • Best",
+                "gemini-3.6-flash": "⚡ 3.6 Flash",
+                "gemini-3.5-flash": "🚀 3.5 Flash",
+                "gemini-3.5-flash-lite": "💡 3.5 Lite",
+                "gemini-3.1-flash-lite": "✨ 3.1 Lite",
+                "gemini-3.1-pro-preview": "🧠 3.1 Pro",
+            }.get(item, item),
+            help="Select the Gemini model used for translation.",
+        )
 
         with st.container(key="controller_actions"):
             clear_column, save_column = st.columns(2)
@@ -4211,7 +4283,7 @@ else:
         if st.session_state.pop("controller_notice", ""):
             st.success("✅ Video project cleared.")
 
-        if st.button("Log out", key="customer_logout", use_container_width=True):
+        if logout_requested:
             release_customer_session(st.session_state.get("customer_code", ""), current_token)
             _session_cookie_delete()
             clear_private_user_session()
