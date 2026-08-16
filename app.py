@@ -563,6 +563,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 [data-testid="stFileUploader"] section{border:1px solid #334155!important;border-radius:16px!important;background:#111c2d!important;padding:12px!important}
 .stAlert{border-radius:14px!important}
 @media(max-width:700px){.block-container{padding-left:.8rem!important;padding-right:.8rem!important;padding-top:.7rem!important}.stButton>button,.stDownloadButton>button{min-height:50px!important}.stTextInput input,.stTextArea textarea{font-size:16px!important}}
+.stFormSubmitButton button{background:linear-gradient(90deg,#0284c7,#22d3ee)!important;color:#ffffff!important;border:1px solid #67e8f9!important;min-height:52px!important;font-weight:900!important;text-shadow:0 1px 2px rgba(0,0,0,.35)!important}
+.stFormSubmitButton button:hover{filter:brightness(1.08)!important;box-shadow:0 8px 20px rgba(8,145,178,.25)!important}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -3304,6 +3306,21 @@ def public_login_screen():
         )
 
 
+KHMER_MONTHS = {
+    1: "មករា", 2: "កុម្ភៈ", 3: "មីនា", 4: "មេសា", 5: "ឧសភា", 6: "មិថុនា",
+    7: "កក្កដា", 8: "សីហា", 9: "កញ្ញា", 10: "តុលា", 11: "វិច្ឆិកា", 12: "ធ្នូ",
+}
+
+def _khmer_digits(value):
+    return str(value).translate(str.maketrans("0123456789", "០១២៣៤៥៦៧៨៩"))
+
+def format_khmer_datetime(value):
+    local_value = value.astimezone()
+    return (
+        f"ថ្ងៃទី {_khmer_digits(local_value.day)} ខែ {KHMER_MONTHS[local_value.month]} "
+        f"ឆ្នាំ {_khmer_digits(local_value.year)} ម៉ោង {_khmer_digits(local_value.hour)}:{_khmer_digits(local_value.minute).zfill(2)}"
+    )
+
 def _copy_card(name, code, expires_text):
     import html
     safe_name = html.escape(str(name))
@@ -3316,10 +3333,10 @@ def _copy_card(name, code, expires_text):
         f"""
         <div style="font-family:Arial,sans-serif;background:#0f172a;color:white;border:1px solid #22d3ee;border-radius:14px;padding:14px;margin:4px 0 10px">
           <div style="font-weight:800;margin-bottom:7px">Name: {safe_name}</div>
-          <div style="font-weight:800;margin-bottom:7px">Password / Access Code: {safe_code}</div>
+          <div style="font-weight:800;margin-bottom:7px">ពាក្យសម្ងាត់ / Access Code: {safe_code}</div>
           <div style="opacity:.8;margin-bottom:10px">Expires: {safe_expiry}</div>
           <button onclick="navigator.clipboard.writeText(`{safe_payload}`).then(()=>this.innerText='✅ COPIED')"
-            style="width:100%;padding:11px;border:0;border-radius:9px;background:linear-gradient(90deg,#0284c7,#22d3ee);color:white;font-weight:900">COPY NAME + PASSWORD / CODE</button>
+            style="width:100%;padding:11px;border:0;border-radius:9px;background:linear-gradient(90deg,#0284c7,#22d3ee);color:white;font-weight:900">ចម្លងឈ្មោះ + ពាក្យសម្ងាត់ / Code</button>
         </div>
         """,
         height=176,
@@ -3359,25 +3376,25 @@ def admin_dashboard():
 
     top_left, top_right = st.columns([5, 1])
     with top_left:
-        st.markdown('<div class="hero"><h1>AI KHEMRA BRO</h1><p>CREATE CUSTOMER ACCESS</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero"><h1>AI KHEMRA BRO</h1><p>បង្កើត Access Code អតិថិជន</p></div>', unsafe_allow_html=True)
     with top_right:
         if st.button("Logout", key="admin_logout", use_container_width=True):
             _audit("admin_logout", get_admin_username(), "success")
             leave_private_admin_route()
 
     with st.form("create_license_form", clear_on_submit=True):
-        customer_name = st.text_input("Customer name", placeholder="Name")
+        customer_name = st.text_input("ឈ្មោះអតិថិជន", placeholder="វាយឈ្មោះអតិថិជន")
         manual_access_code = st.text_input(
-            "Password / Access Code",
-            placeholder="KHBR-001 or VIP-2026-001",
-            help="This is the password the customer uses to enter the app.",
+            "ពាក្យសម្ងាត់ / Access Code",
+            placeholder="KHBR-001 ឬ VIP-2026-001",
+            help="នេះជាពាក្យសម្ងាត់សម្រាប់អតិថិជនចូលកម្មវិធី។",
         )
-        duration_label = st.selectbox("Duration", ["7 days", "1 month", "3 months", "6 months", "1 year"])
-        create_clicked = st.form_submit_button("Create and Share Code", use_container_width=True)
+        duration_label = st.selectbox("រយៈពេល", ["៧ ថ្ងៃ", "១ ខែ", "៣ ខែ", "៦ ខែ", "១ ឆ្នាំ"])
+        create_clicked = st.form_submit_button("បង្កើត និងចែករំលែក Code", use_container_width=True)
 
     if create_clicked:
-        days = {"7 days": 7, "1 month": 30, "3 months": 90, "6 months": 180, "1 year": 365}[duration_label]
-        plan_label = {"7 days": "7 ថ្ងៃ", "1 month": "1 ខែ", "3 months": "3 ខែ", "6 months": "6 ខែ", "1 year": "1 ឆ្នាំ"}[duration_label]
+        days = {"៧ ថ្ងៃ": 7, "១ ខែ": 30, "៣ ខែ": 90, "៦ ខែ": 180, "១ ឆ្នាំ": 365}[duration_label]
+        plan_label = {"៧ ថ្ងៃ": "៧ ថ្ងៃ", "១ ខែ": "១ ខែ", "៣ ខែ": "៣ ខែ", "៦ ខែ": "៦ ខែ", "១ ឆ្នាំ": "១ ឆ្នាំ"}[duration_label]
         try:
             code, expires, card_until = add_license(customer_name, manual_access_code, days, plan_label)
             st.session_state.new_license_name = normalize_customer_name(customer_name)
@@ -3389,7 +3406,7 @@ def admin_dashboard():
 
     card_until = st.session_state.get("new_license_card_until")
     if card_until and _utcnow() < _parse_iso(card_until):
-        expiry_text = _parse_iso(st.session_state.new_license_expiry).astimezone().strftime("%Y-%m-%d %H:%M")
+        expiry_text = format_khmer_datetime(_parse_iso(st.session_state.new_license_expiry))
         _copy_card(st.session_state.new_license_name, st.session_state.new_license_code, expiry_text)
 
 initialize_license_database()
