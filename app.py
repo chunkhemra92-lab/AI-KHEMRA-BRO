@@ -2649,7 +2649,7 @@ def create_mp3(
 
         result = subprocess.run(command, capture_output=True, text=True, timeout=900)
         if result.returncode != 0:
-            raise RuntimeError(result.stderr[-2200:] or 'FFmpeg failed.')
+            raise RuntimeError("FFmpeg មិនអាចបង្កើតសំឡេង MP3 បានទេ។ សូមពិនិត្យ SRT ហើយសាកម្ដងទៀត។") from None
         if not output.exists() or output.stat().st_size < 1000:
             raise RuntimeError('MP3 ត្រូវបានបង្កើត ប៉ុន្តែមិនមានសំឡេងគ្រប់គ្រាន់។')
 
@@ -3799,9 +3799,6 @@ with tab_video:
         key="main_srt_editor",
     )
     st.session_state.srt_text = st.session_state.main_srt_editor
-    if st.session_state.srt_text.strip():
-        st.caption("SRT សម្រាប់ Copy ទៅប្រើបន្ត")
-        st.code(st.session_state.srt_text, language="srt")
 
     # Keep both SRT action buttons on one row directly below the editor,
     # including portrait and landscape mobile screens.
@@ -3861,7 +3858,7 @@ with tab_video:
     # remove the progress/result messages and replace them with filename + Download.
     if not st.session_state.audio_bytes:
         generate_clicked = st.button(
-            "🎙️ Generate Dubbed Audio (MP3)",
+            "🎙️ បង្កើតសំឡេង MP3",
             key="generate_audio",
             use_container_width=False,
         )
@@ -4010,7 +4007,6 @@ with tab_translate:
                 st.session_state.srt_text = "\n\n".join(blocks)
                 st.session_state.pending_editor_update = st.session_state.srt_text
                 st.success("✅ បកប្រែរួចរាល់ និងរក្សា Timestamp ដើម។")
-                st.code(st.session_state.srt_text, language="srt")
             except Exception as exc:
                 st.error(f"❌ {exc}")
 
