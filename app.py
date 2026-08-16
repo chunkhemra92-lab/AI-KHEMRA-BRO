@@ -590,6 +590,17 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   .social-split a{min-height:54px!important;font-size:14px!important}
   .st-key-customer_login_box{padding:24px 18px 22px!important}
 }
+/* Final admin-home cleanup: compact header, focused form, and quiet secondary controls. */
+.admin-clean-title{margin:4px 0 18px!important;padding:0!important}
+.admin-clean-title h1{margin:0!important;color:#f8fafc!important;font-size:clamp(24px,4vw,36px)!important;font-weight:950!important;letter-spacing:-.4px!important;line-height:1.1!important}
+.admin-clean-title p{margin:6px 0 0!important;color:#22d3ee!important;font-size:14px!important;font-weight:800!important}
+.st-key-admin_logout{padding-top:4px!important}
+.st-key-admin_logout button{min-height:40px!important;border-radius:10px!important;background:transparent!important;border:1px solid #334155!important;color:#cbd5e1!important;font-size:13px!important}
+.st-key-admin_logout button:hover{border-color:#22d3ee!important;color:#fff!important;background:#132235!important}
+.st-key-create_license_form{max-width:720px!important;margin:0 auto!important;padding:24px 24px 20px!important;border:1px solid #263449!important;border-radius:18px!important;background:#101621!important;box-shadow:0 12px 28px rgba(0,0,0,.16)!important}
+.st-key-create_license_form label,.st-key-create_license_form label p{font-size:15px!important}
+.st-key-create_license_form input{min-height:50px!important}
+@media(max-width:700px){.admin-clean-title{margin-top:0!important;margin-bottom:14px!important}.st-key-create_license_form{padding:20px 16px 16px!important;border-radius:15px!important}.st-key-admin_logout button{min-height:38px!important;font-size:12px!important}}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -3357,11 +3368,11 @@ def _copy_card(name, code, expires_text):
     components.html(
         f"""
         <div style="font-family:Arial,sans-serif;background:#0f172a;color:white;border:1px solid #22d3ee;border-radius:14px;padding:14px;margin:4px 0 10px">
-          <div style="font-weight:800;margin-bottom:7px">Name: {safe_name}</div>
+          <div style="font-weight:800;margin-bottom:7px">ឈ្មោះ: {safe_name}</div>
           <div style="font-weight:800;margin-bottom:7px">ពាក្យសម្ងាត់ / Access Code: {safe_code}</div>
-          <div style="opacity:.8;margin-bottom:10px">Expires: {safe_expiry}</div>
+          <div style="opacity:.8;margin-bottom:10px">ផុតកំណត់: {safe_expiry}</div>
           <button onclick="navigator.clipboard.writeText(`{safe_payload}`).then(()=>this.innerText='✅ COPIED')"
-            style="width:100%;padding:11px;border:0;border-radius:9px;background:linear-gradient(90deg,#0284c7,#22d3ee);color:white;font-weight:900">ចម្លងឈ្មោះ + ពាក្យសម្ងាត់ / Code</button>
+            style="width:100%;padding:11px;border:0;border-radius:9px;background:linear-gradient(90deg,#0284c7,#22d3ee);color:white;font-weight:900">ចម្លងឈ្មោះ + Code</button>
         </div>
         """,
         height=176,
@@ -3399,20 +3410,18 @@ def admin_dashboard():
                 leave_private_admin_route()
         return
 
-    top_left, top_right = st.columns([5, 1])
-    with top_left:
-        st.markdown('<div class="hero"><h1>AI KHEMRA BRO</h1><p>បង្កើត Access Code អតិថិជន</p></div>', unsafe_allow_html=True)
-    with top_right:
-        if st.button("Logout", key="admin_logout", use_container_width=True):
+    title_col, action_col = st.columns([4, 1])
+    with title_col:
+        st.markdown('<div class="admin-clean-title"><h1>AI KHEMRA BRO</h1><p>បង្កើត Access Code អតិថិជន</p></div>', unsafe_allow_html=True)
+    with action_col:
+        if st.button("ចាកចេញ", key="admin_logout", use_container_width=True):
             _audit("admin_logout", get_admin_username(), "success")
             leave_private_admin_route()
-
     with st.form("create_license_form", clear_on_submit=True):
         customer_name = st.text_input("ឈ្មោះអតិថិជន", placeholder="វាយឈ្មោះអតិថិជន")
         manual_access_code = st.text_input(
             "ពាក្យសម្ងាត់ / Access Code",
             placeholder="KHBR-001 ឬ VIP-2026-001",
-            help="នេះជាពាក្យសម្ងាត់សម្រាប់អតិថិជនចូលកម្មវិធី។",
         )
         duration_label = st.selectbox("រយៈពេល", ["៧ ថ្ងៃ", "១ ខែ", "៣ ខែ", "៦ ខែ", "១ ឆ្នាំ"])
         create_clicked = st.form_submit_button("បង្កើត និងចែករំលែក Code", use_container_width=True)
