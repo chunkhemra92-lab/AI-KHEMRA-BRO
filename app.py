@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+import threading
 from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
@@ -2289,10 +2290,62 @@ def prepare_tts_text(text):
     return clean
 
 
-async def synthesize(text, profile, output_path):
+_REFERENCE_MODEL = None
+_REFERENCE_MODEL_LOCK = threading.Lock()
+_REFERENCE_MODEL_ID = "sumnim/VoxCPM2-Khmer"
+
+def _reference_clone_sync(text, output_path, reference_audio_path, reference_prompt_text=""):
+    """Generate Khmer speech using the uploaded reference voice when VoxCPM is installed."""
+    try:
+        import soundfile as sf
+        from voxcpm import VoxCPM
+    except ImportError as exc:
+        raise RuntimeError(
+            "Reference Voice Clone ត្រូវការ optional backend `voxcpm` និង `soundfile`; "
+            "សូមដំឡើងពី requirements-voice-clone.txt លើម៉ាស៊ីនដែលមាន GPU។"
+        ) from exc
+    global _REFERENCE_MODEL
+    with _REFERENCE_MODEL_LOCK:
+        if _REFERENCE_MODEL is None:
+            _REFERENCE_MODEL = VoxCPM.from_pretrained(_REFERENCE_MODEL_ID, load_denoiser=False)
+        kwargs = {
+            "text": text,
+            "reference_wav_path": str(reference_audio_path),
+            "cfg_value": 2.0,
+            "inference_timesteps": 10,
+            "normalize": True,
+            "denoise": True,
+        }
+        prompt_text = (reference_prompt_text or "").strip()
+        if prompt_text:
+            kwargs["prompt_wav_path"] = str(reference_audio_path)
+            kwargs["prompt_text"] = prompt_text
+        wav = _REFERENCE_MODEL.generate(**kwargs)
+        sample_rate = getattr(getattr(_REFERENCE_MODEL, "tts_model", None), "sample_rate", 16000)
+        wav_path = Path(str(output_path) + ".wav")
+        sf.write(str(wav_path), wav, sample_rate)
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav_path),
+             "-ar", "48000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "192k", str(output_path)],
+            check=True,
+        )
+        wav_path.unlink(missing_ok=True)
+    if not Path(output_path).exists() or Path(output_path).stat().st_size <= 500:
+        raise RuntimeError("Reference Voice Clone មិនបានបង្កើតឯកសារសំឡេងត្រឹមត្រូវទេ។")
+
+async def synthesize(text, profile, output_path, reference_audio_path=None, reference_prompt_text=""):
     clean_text = prepare_tts_text(text)
     if not clean_text:
         raise ValueError('មានបន្ទាត់ SRT ទទេ។')
+    if reference_audio_path:
+        await asyncio.to_thread(
+            _reference_clone_sync,
+            clean_text,
+            output_path,
+            reference_audio_path,
+            reference_prompt_text,
+        )
+        return
     last_error = None
     attempts = [
         profile,
@@ -2374,6 +2427,7 @@ def effective_voice_tag(tag, voice_mode):
 def create_mp3(
     srt_text, progress_callback=None, audio_sync_mode="Speed Up Only", voice_mode="Auto",
     target_language=DEFAULT_TARGET_LANGUAGE, music_path=None, ambience_path=None,
+    reference_audio_path=None, reference_prompt_text="",
 ):
     """
     Create one synchronized Khmer MP3.
@@ -2413,12 +2467,18 @@ def create_mp3(
             cue = cues[index]
             cue['effective_tag'] = effective_voice_tag(cue.get('tag', 'M_ADULT'), voice_mode)
             profile = VOICE_PROFILES.get(cue['effective_tag'], VOICE_PROFILES['M_ADULT'])
-            run_async(synthesize(cue['text'], profile, clips[index]))
+            run_async(synthesize(
+                cue['text'], profile, clips[index],
+                reference_audio_path=reference_audio_path,
+                reference_prompt_text=reference_prompt_text,
+            ))
             return index, probe_audio_duration(clips[index])
 
         # TTS calls are independent; render a small bounded group concurrently,
         # then assemble strictly by the original SRT order below.
-        worker_count = min(6, max(2, total_cues))
+        # Reference cloning models are GPU/memory heavy and not thread-safe;
+        # serialize those calls while keeping Edge TTS concurrent by default.
+        worker_count = 1 if reference_audio_path else min(6, max(2, total_cues))
         completed = 0
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = [executor.submit(render_clip, index) for index in range(total_cues)]
@@ -3668,6 +3728,21 @@ ambience_upload = st.file_uploader(
     type=["mp3", "wav", "m4a", "ogg"],
     key="nature_ambience_upload",
 )
+st.markdown("### 🎙️ Reference Voice Clone (optional)")
+reference_voice_upload = st.file_uploader(
+    "Upload the reference speaker audio",
+    type=["mp3", "wav", "m4a", "ogg"],
+    key="reference_voice_upload",
+    help="ប្រើ VoxCPM2-Khmer ដើម្បីរក្សា timbre របស់ reference voice; ត្រូវការដំឡើង optional backend និង GPU។",
+)
+reference_prompt_text = st.text_area(
+    "Exact transcript of the reference audio (optional, improves similarity)",
+    height=90,
+    key="reference_prompt_text",
+    placeholder="បញ្ចូលអត្ថបទដែលនិយាយនៅក្នុង reference MP3 ប្រសិនបើមាន",
+)
+if reference_voice_upload:
+    st.info("🎙️ Reference Clone mode នឹងប្រើសំឡេង reference ដូចគ្នាសម្រាប់បន្ទាត់ទាំងអស់; `[M]/[F]` និង thought tags នឹងគ្រប់គ្រងតែ style និងការកែសំឡេង។")
 with tab_video:
 
     st.markdown('<div class="section-title">1️⃣ Generate Subtitles (Khmer ខ្មែរ)</div>', unsafe_allow_html=True)
@@ -3889,6 +3964,7 @@ with tab_video:
 
                 music_path = save_upload(music_upload) if music_upload else None
                 ambience_path = save_upload(ambience_upload) if ambience_upload else None
+                reference_path = save_upload(reference_voice_upload) if reference_voice_upload else None
                 try:
                     update_audio_progress(1, "កំពុងចាប់ផ្ដើមបង្កើតសំឡេង…")
                     st.session_state.audio_bytes = create_mp3(
@@ -3899,6 +3975,8 @@ with tab_video:
                         target_language=target_language,
                         music_path=music_path,
                         ambience_path=ambience_path,
+                        reference_audio_path=reference_path,
+                        reference_prompt_text=reference_prompt_text,
                     )
                     # Clear the processing display immediately after completion.
                     progress_bar.empty()
@@ -3916,6 +3994,8 @@ with tab_video:
                         music_path.unlink(missing_ok=True)
                     if ambience_path is not None:
                         ambience_path.unlink(missing_ok=True)
+                    if reference_path is not None:
+                        reference_path.unlink(missing_ok=True)
     else:
         if not st.session_state.get("mp3_filename_widget"):
             st.session_state.mp3_filename_widget = st.session_state.get(
@@ -4031,6 +4111,7 @@ with tab_srt_speech:
         else:
             music_path = save_upload(music_upload) if music_upload else None
             ambience_path = save_upload(ambience_upload) if ambience_upload else None
+            reference_path = save_upload(reference_voice_upload) if reference_voice_upload else None
             try:
                 with st.spinner("កំពុងបង្កើតសំឡេង…"):
                     st.session_state.speech_tab_audio_bytes = create_mp3(
@@ -4040,6 +4121,8 @@ with tab_srt_speech:
                         target_language=target_language,
                         music_path=music_path,
                         ambience_path=ambience_path,
+                        reference_audio_path=reference_path,
+                        reference_prompt_text=reference_prompt_text,
                     )
                 st.success("✅ បង្កើត MP3 រួចរាល់។")
             except Exception as exc:
@@ -4049,6 +4132,8 @@ with tab_srt_speech:
                     music_path.unlink(missing_ok=True)
                 if ambience_path is not None:
                     ambience_path.unlink(missing_ok=True)
+                if reference_path is not None:
+                    reference_path.unlink(missing_ok=True)
     if st.session_state.get("speech_tab_audio_bytes"):
         st.audio(st.session_state.speech_tab_audio_bytes, format="audio/mp3")
         st.download_button(
