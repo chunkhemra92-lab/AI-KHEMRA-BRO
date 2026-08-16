@@ -3666,18 +3666,9 @@ st.markdown(
 tab_video, tab_translate, tab_srt_speech, tab_text_speech = st.tabs(
     ["🎬 Video → SRT", "📝 AI Subtitle Translator", "📜 SRT → Speech", "🎙️ Text → Speech"]
 )
-st.markdown("### 🎚️ 4-Track Audio Mix")
-st.caption("Track 1/2 = dialogue and inner thought. Track 3/4 are optional music and nature ambience layers.")
-music_upload = st.file_uploader(
-    "Track 3 — Daydream Music (optional)",
-    type=["mp3", "wav", "m4a", "ogg"],
-    key="daydream_music_upload",
-)
-ambience_upload = st.file_uploader(
-    "Track 4 — Nature & Bird Ambience (optional)",
-    type=["mp3", "wav", "m4a", "ogg"],
-    key="nature_ambience_upload",
-)
+# Optional music/ambience inputs are intentionally disabled to keep the original simple UI.
+music_upload = None
+ambience_upload = None
 with tab_video:
 
     st.markdown('<div class="section-title">1️⃣ Generate Subtitles (Khmer ខ្មែរ)</div>', unsafe_allow_html=True)
@@ -3897,8 +3888,8 @@ with tab_video:
                         unsafe_allow_html=True,
                     )
 
-                music_path = save_upload(music_upload) if music_upload else None
-                ambience_path = save_upload(ambience_upload) if ambience_upload else None
+                music_path = None
+                ambience_path = None
                 try:
                     update_audio_progress(1, "កំពុងចាប់ផ្ដើមបង្កើតសំឡេង…")
                     st.session_state.audio_bytes = create_mp3(
@@ -4039,8 +4030,8 @@ with tab_srt_speech:
         if not speech_srt.strip():
             st.warning("សូមបញ្ចូល Khmer SRT។")
         else:
-            music_path = save_upload(music_upload) if music_upload else None
-            ambience_path = save_upload(ambience_upload) if ambience_upload else None
+            music_path = None
+            ambience_path = None
             try:
                 with st.spinner("កំពុងបង្កើតសំឡេង…"):
                     st.session_state.speech_tab_audio_bytes = create_mp3(
