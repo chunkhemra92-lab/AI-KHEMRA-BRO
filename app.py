@@ -2492,7 +2492,7 @@ def create_mp3(
             effective_tag = cue.get('effective_tag', cue.get('tag', 'M_ADULT'))
             is_thought = effective_tag in {'M_THINK', 'F_THINK'}
             if is_thought:
-                # Track 2: wide, airy, reverberant inner monologue.
+                # Track 2: close, natural inner monologue with only a subtle binaural offset.
                 parts.extend([
                     # Natural inner voice: close and human, with only a subtle
                     # binaural offset; deliberately no audible echo or hall tail.
@@ -2565,7 +2565,7 @@ def create_mp3(
             + f'amix=inputs={len(mix_inputs)}:duration=longest:dropout_transition=0:normalize=0,'
               'acompressor=threshold=-18dB:ratio=1.35:attack=18:release=240:makeup=1.0:knee=5,'
               'alimiter=limit=0.94:attack=8:release=150,'
-              'loudnorm=I=-14:TP=-1.5:LRA=7,'
+              'loudnorm=I=-23:TP=-4.0:LRA=9,'
               f'apad=whole_dur={total:.3f},atrim=0:{total:.3f}[out]'
         )
 
