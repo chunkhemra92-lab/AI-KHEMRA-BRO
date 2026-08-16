@@ -2498,7 +2498,8 @@ def create_mp3(
                     'lowpass=f=14500:p=2',
                     'treble=g=4:f=10000',
                     'pan=stereo|c0=c0|c1=c0',
-                    'extrastereo=m=2.2',
+                    'haas=left_delay=2.5:right_delay=3.5:side_gain=1.25',
+                    'extrastereo=m=1.8',
                     'aecho=0.65:0.35:45|300|650|1100|1800|2600|3200:0.32|0.24|0.18|0.13|0.09|0.06|0.04',
                     'volume=-7dB',
                 ])
