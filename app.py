@@ -3336,7 +3336,33 @@ def admin_dashboard():
             _audit("admin_logout", get_admin_username(), "success")
             leave_private_admin_route()
 
-    st.markdown("## ➕ បង្កើត Customer")
+    # Keep owner work in one predictable order: summary, creation, management, audit.
+    report_rows = license_rows()
+    report_now = _utcnow()
+    report_total = len(report_rows)
+    report_expired = sum(1 for row in report_rows if report_now >= _parse_iso(row["expires_at"]))
+    report_disabled = sum(1 for row in report_rows if not bool(row["is_active"]))
+    report_online = sum(
+        1 for row in report_rows
+        if bool(row["active_session_hash"]) and row["active_session_last_seen"]
+        and (report_now - _parse_iso(row["active_session_last_seen"])) <= datetime.timedelta(minutes=SESSION_IDLE_MINUTES)
+    )
+    report_expiring_soon = sum(
+        1 for row in report_rows
+        if report_now < _parse_iso(row["expires_at"])
+        and (_parse_iso(row["expires_at"]) - report_now) <= datetime.timedelta(days=7)
+    )
+    st.markdown("## 1️⃣ របាយការណ៍សង្ខេប")
+    report_cols = st.columns(5)
+    report_cols[0].metric("Customer សរុប", report_total)
+    report_cols[1].metric("Active", max(0, report_total - report_expired - report_disabled))
+    report_cols[2].metric("Online", report_online)
+    report_cols[3].metric("ផុតកំណត់", report_expired)
+    report_cols[4].metric("ជិតផុតកំណត់", report_expiring_soon)
+    st.caption("លំដាប់ប្រើប្រាស់៖ មើលរបាយការណ៍ → បង្កើត Code → គ្រប់គ្រង Customer → ពិនិត្យ Audit Log")
+    st.divider()
+
+    st.markdown("## 2️⃣ បង្កើត Customer")
     st.caption("Owner ជាអ្នកកំណត់ Access Code ដោយខ្លួនឯង។ Code មួយអាច Login លើ iPhone, Android និង Browser ផ្សេងៗបាន ដោយមិនចងជាមួយឧបករណ៍។")
     with st.form("create_license_form", clear_on_submit=True):
         customer_name = st.text_input("ឈ្មោះអតិថិជន")
@@ -3363,7 +3389,8 @@ def admin_dashboard():
         expiry_text = _parse_iso(st.session_state.new_license_expiry).astimezone().strftime("%Y-%m-%d %H:%M")
         _copy_card(st.session_state.new_license_name, st.session_state.new_license_code, expiry_text)
 
-    st.markdown("## 👥 គ្រប់គ្រងអតិថិជន")
+    st.divider()
+    st.markdown("## 3️⃣ គ្រប់គ្រងអតិថិជន")
     search = st.text_input("🔎 ស្វែងរកឈ្មោះ ឬ Code", key="license_search")
     rows = license_rows(search)
     if not rows:
@@ -3427,7 +3454,8 @@ def admin_dashboard():
                 if st.button("លុបជាអចិន្ត្រៃយ៍", key=f"delete_{row['id']}", disabled=confirmation != "DELETE", use_container_width=True):
                     delete_license(row["id"]); st.rerun()
 
-    with st.expander("🧾 Audit Log"):
+    st.divider()
+    with st.expander("4️⃣ 🧾 Audit Log", expanded=False):
         with license_connection() as connection:
             logs = connection.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100").fetchall()
         for log in logs:
