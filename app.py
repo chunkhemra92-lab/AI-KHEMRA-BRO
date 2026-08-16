@@ -2380,8 +2380,8 @@ def create_mp3(
 
     v3.0 rules:
     - Every voice starts at the original SRT start timestamp.
-    - A clip is fitted inside the time available before the next cue.
-    - Generated voices never overlap or compete with one another.
+    - A clip is fitted inside its own SRT start/end window.
+    - Cues may overlap when their original SRT timestamps overlap.
     - Breathy high frequencies are reduced without making speech muddy.
     - Loudness is mastered once at the end instead of aggressively per clip.
     """
@@ -2465,22 +2465,17 @@ def create_mp3(
             start_ms = max(0, int(cue['start']))
             cue_end_ms = max(start_ms + 250, int(cue['end']))
 
-            # The next voice owns its exact start time. The current voice must
-            # finish before that point, so two generated speakers never overlap.
-            if index + 1 < total_cues:
-                next_start_ms = max(start_ms + 250, int(cues[index + 1]['start']))
-                protected_end_ms = min(cue_end_ms, next_start_ms - MIN_VOICE_GAP_MS)
-            else:
-                protected_end_ms = cue_end_ms
-
+            # Preserve each cue's own SRT window. If the next cue starts
+            # before this cue ends, both clips are intentionally mixed together.
+            protected_end_ms = cue_end_ms
             if protected_end_ms <= start_ms + 180:
                 protected_end_ms = start_ms + 180
-
             slot_seconds = max(0.18, (protected_end_ms - start_ms) / 1000.0)
+
             audio_seconds = clip_durations[index]
 
-            # Fit speech inside its slot. The optional slow-down mode uses spare
-            # time for clearer delivery while retaining the no-overlap safeguard.
+            # Fit speech inside its own SRT window. Overlap with another cue is
+            # preserved by the final amix instead of being trimmed at next start.
             required_speed = audio_seconds / slot_seconds
             if audio_sync_mode == "Speed Up & Slow Down":
                 safe_speed = min(max(0.75, required_speed), MAX_TEMPO_SPEED)
