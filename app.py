@@ -564,16 +564,29 @@ VOICE_PROFILES={
 COMPACT_VOICE_TAGS = ("M", "F", "M_THINK", "F_THINK")
 
 
+def _voice_tag_key(tag):
+    """Normalize English/Khmer tag text for reliable comparison."""
+    return re.sub(r"[\s_-]+", "", str(tag or "").upper().strip())
+
+
 def compact_voice_tag(tag):
-    """Convert legacy age/role tags into the four public SRT voice tags."""
-    normalized = str(tag or "M").upper().strip()
-    if normalized == "M_THINK":
+    """Convert English and Khmer role labels into the four public SRT voice tags."""
+    normalized = _voice_tag_key(tag)
+    if normalized in {"MTHINK", "MALETHINK", "INNERMALE", "THINKM", "ប្រុសគិតក្នុងចិត្ត", "ប្រុសក្នុងចិត្ត", "ប្រុសគិត"}:
         return "M_THINK"
-    if normalized == "F_THINK":
+    if normalized in {"FTHINK", "FEMALETHINK", "INNERFEMALE", "THINKF", "ស្រីគិតក្នុងចិត្ត", "ស្រីក្នុងចិត្ត", "ស្រីគិត"}:
         return "F_THINK"
-    if normalized in {"F", "GIRL", "F_YOUNG", "F_ADULT", "F_OLD", "NARRATOR_F", "OLD_F"}:
+    if normalized in {"F", "FEMALE", "GIRL", "FYOUNG", "FADULT", "FOLD", "NARRATORF", "OLDF", "ស្រី", "ស្រីនិយាយ", "ស្រីទាំងអស់"}:
         return "F"
     return "M"
+
+
+def is_known_voice_tag(tag):
+    """Return True only for supported labels, avoiding removal of ordinary [text]."""
+    normalized = _voice_tag_key(tag)
+    return normalized in {
+        "M", "MALE", "BOY", "MYOUNG", "MADULT", "MOLD", "MTHINK", "F", "FEMALE", "GIRL", "FYOUNG", "FADULT", "FOLD", "FTHINK", "NARRATORM", "NARRATORF", "OLDM", "OLDF", "INNERMALE", "INNERFEMALE", "THINKM", "THINKF", "ប្រុស", "ស្រី", "ប្រុសនិយាយ", "ស្រីនិយាយ", "ប្រុសទាំងអស់", "ស្រីទាំងអស់", "ប្រុសគិតក្នុងចិត្ត", "ស្រីគិតក្នុងចិត្ត", "ប្រុសក្នុងចិត្ត", "ស្រីក្នុងចិត្ត", "ប្រុសគិត", "ស្រីគិត"
+    }
 
 
 # Smooth-dubbing controls: gentle fades remove clicks/cuts when speaker labels change.
@@ -1954,7 +1967,7 @@ def _translate_batch_text_only(
     cue_lines = "\n".join(
         f'ID={cue["id"]} | TIME={seconds_to_srt(cue["start"])} --> '
         f'{seconds_to_srt(cue["end"])} | MAX_WORDS={cue_word_limit(cue["start"], cue["end"])} '
-        f'| SOURCE={cue["source"]}'
+        f'| INPUT_TAG={cue.get("input_tag", "") or "AUTO"} | SOURCE={cue["source"]}'
         for cue in batch
     )
     prompt = f"""
@@ -1966,7 +1979,7 @@ THE FOLLOWING SIX RULES ARE MANDATORY:
 2. MATCH THE ACTOR: Choose pronouns and forms of address that fit each speaker's age, status, relationship, and scene context, including បង/អូន, ឯង/អញ, ខ្ញុំ/លោក, ពួកម៉ាក, សម្លាញ់, and អា when appropriate.
 3. EMOTIONAL DEPTH: Preserve anger, humour, tears, warmth, sarcasm, fear, shock, romance, and hidden meaning. Recreate idioms and wordplay naturally in Khmer instead of translating them literally.
 4. SUBTITLE TIMING: Keep the original ID and timestamps unchanged. Each line must be concise enough for MAX_WORDS and its exact time slot, but never delete a spoken meaning, short reply, name, number, negation, filler, cry, or reaction.
-5. AUDIO TYPES AND TAGS: Select exactly one tag for the actual speaker: M for male dialogue, F for female dialogue, M_THINK for a male character's unheard inner thought, or F_THINK for a female character's unheard inner thought. Do not use any other tag.
+5. AUDIO TYPES AND TAGS: Select exactly one tag for the actual speaker: M for male dialogue, F for female dialogue, M_THINK for a male character's unheard inner thought, or F_THINK for a female character's unheard inner thought. If INPUT_TAG is not AUTO, preserve that explicit user-provided gender/inner-thought label. Do not use any other tag.
 6. OUTPUT FORMAT: Return every input ID exactly once and in order. The application converts your JSON into SRT. Return JSON only, with no markdown, code block, heading, note, Chinese, Thai, Vietnamese, or English dialogue in text.
 
 SELECTED TRANSLATION STYLE (MANDATORY):
@@ -1993,7 +2006,10 @@ CUES:
             continue
         if cue_id not in allowed_ids:
             continue
+        source_cue = next((cue for cue in batch if cue["id"] == cue_id), None)
         tag = compact_voice_tag(row.get("tag", "M"))
+        if source_cue and source_cue.get("explicit_tag"):
+            tag = source_cue["input_tag"]
         dialogue = normalize_dialogue(row.get("text", ""))
         if dialogue and (not target_is_khmer or not contains_cjk(dialogue)):
             parsed[cue_id] = {"tag": tag, "text": dialogue}
@@ -2179,6 +2195,7 @@ def srt_to_structured_cues(srt_text):
             "start_ms": cue["start"],
             "end_ms": cue["end"],
             "tag": cue["tag"],
+            "explicit_tag": cue.get("explicit_tag", False),
             "text": cue["text"],
         }
         for index, cue in enumerate(parsed, start=1)
@@ -2232,7 +2249,7 @@ def analyze_inner_thoughts(srt_text, api_key, model_name, video_path=None):
 
 def parse_srt(srt_text):
     time_re=re.compile(r'(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})')
-    tag_re=re.compile(r'^\[(BOY|GIRL|M_YOUNG|F_YOUNG|M_ADULT|F_ADULT|M_OLD|F_OLD|M_THINK|F_THINK|NARRATOR_M|NARRATOR_F|M|F|OLD_M|OLD_F)\]\s*',re.I)
+    tag_re=re.compile(r'^\[([^\]]+)\]\s*',re.I)
     def to_ms(v):
         h,m,s,ms=map(int,v); return ((h*60+m)*60+s)*1000+ms
     cues=[]
@@ -2243,12 +2260,13 @@ def parse_srt(srt_text):
         match=time_re.search(lines[idx])
         if not match: continue
         dialogue=' '.join(lines[idx+1:]).strip(); tag_match=tag_re.match(dialogue)
-        tag=tag_match.group(1).upper() if tag_match else 'M_ADULT'
-        if tag_match: dialogue=dialogue[tag_match.end():].strip()
+        raw_tag = tag_match.group(1).strip() if tag_match else ''
+        tag = compact_voice_tag(raw_tag) if is_known_voice_tag(raw_tag) else 'M_ADULT'
+        if tag_match and is_known_voice_tag(raw_tag): dialogue=dialogue[tag_match.end():].strip()
         if dialogue:
             start_ms=to_ms(match.groups()[:4]); end_ms=to_ms(match.groups()[4:])
             if end_ms <= start_ms: end_ms = start_ms + 350
-            cues.append({'start':start_ms,'end':end_ms,'tag':tag,'text':dialogue})
+            cues.append({'start':start_ms,'end':end_ms,'tag':tag,'explicit_tag': bool(tag_match and is_known_voice_tag(raw_tag)),'text':dialogue})
     return cues
 
 def run_async(coro):
@@ -3903,6 +3921,8 @@ with tab_translate:
                             "start": cue["start_ms"] / 1000.0,
                             "end": cue["end_ms"] / 1000.0,
                             "source": cue["text"],
+                            "input_tag": compact_voice_tag(cue.get("tag", "M_ADULT")),
+                            "explicit_tag": cue.get("explicit_tag", False),
                         }
                         for cue in source_cues
                     ]
