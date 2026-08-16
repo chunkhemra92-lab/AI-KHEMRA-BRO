@@ -73,6 +73,17 @@ div[data-testid="stTextArea"] textarea{
   border-radius:10px!important;font-size:16px!important;line-height:1.65!important;
   font-family:"Noto Sans Khmer","Khmer OS System",Arial,sans-serif!important
 }
+/* Remove Streamlit's password-visibility button: it rendered as a large white
+   block on the owner-login page. The password field remains fully functional. */
+div[data-testid="stTextInput"] [data-baseweb="input"]{
+  background:#182438!important;border:1px solid #8290a4!important;border-radius:10px!important;
+}
+div[data-testid="stTextInput"] [data-baseweb="input"] input{
+  background:transparent!important;color:#ffffff!important;padding-right:12px!important;
+}
+div[data-testid="stTextInput"] [data-baseweb="input"] button{
+  display:none!important;
+}
 /* Beautiful mobile tab menu: all 4 tabs stay fully visible. */
 div[data-baseweb="tab-list"]{
   gap:8px!important;
