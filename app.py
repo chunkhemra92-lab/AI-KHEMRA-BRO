@@ -684,6 +684,11 @@ VOICE_FADE_IN_SECONDS = 0.045
 VOICE_FADE_OUT_SECONDS = 0.070
 MIN_VOICE_GAP_MS = 12
 MAX_TEMPO_SPEED = 1.65
+# Bounded service calls keep one temporary provider failure from blocking an entire project.
+EDGE_TTS_REQUEST_TIMEOUT_SECONDS = 75
+EDGE_TTS_MAX_CONCURRENT_REQUESTS = 4
+FFMPEG_CLIP_CONVERSION_TIMEOUT_SECONDS = 180
+FFMPEG_FINAL_MIX_TIMEOUT_SECONDS = 900
 
 TRANSLATE_PROMPT = """You are an expert Khmer movie subtitler, Chinese-drama translator, dubbing script writer, and character-continuity editor.
 The supplied cue IDs and Whisper timestamps are authoritative and MUST NOT be changed.
@@ -2380,27 +2385,52 @@ def prepare_tts_text(text):
 
 
 async def synthesize(text, profile, output_path):
+    """Create one Edge TTS clip with bounded retries and no stale partial output."""
     clean_text = prepare_tts_text(text)
     if not clean_text:
         raise ValueError('មានបន្ទាត់ SRT ទទេ។')
+    output_path = Path(output_path)
     last_error = None
     attempts = [
         profile,
         {**profile, 'rate': '+0%', 'pitch': '+0Hz', 'volume': '+0%'},
         {'voice': profile.get('voice', PISITH), 'rate': '+0%', 'pitch': '+0Hz', 'volume': '+0%'},
     ]
-    for current in attempts:
+    for attempt_index, current in enumerate(attempts):
+        output_path.unlink(missing_ok=True)
         try:
-            await edge_tts.Communicate(
-                text=clean_text, voice=current['voice'], rate=current['rate'],
-                pitch=current['pitch'], volume=current['volume']
-            ).save(str(output_path))
+            await asyncio.wait_for(
+                edge_tts.Communicate(
+                    text=clean_text, voice=current['voice'], rate=current['rate'],
+                    pitch=current['pitch'], volume=current['volume']
+                ).save(str(output_path)),
+                timeout=EDGE_TTS_REQUEST_TIMEOUT_SECONDS,
+            )
             if output_path.exists() and output_path.stat().st_size > 500:
                 return
+            last_error = RuntimeError('Edge TTS returned an empty audio file.')
         except Exception as exc:
             last_error = exc
-            await asyncio.sleep(0.8)
+        output_path.unlink(missing_ok=True)
+        if attempt_index < len(attempts) - 1:
+            await asyncio.sleep(0.8 * (attempt_index + 1))
     raise RuntimeError(f'Edge TTS មិនបានផ្ញើសំឡេង៖ {last_error or "unknown error"}')
+
+
+def convert_tts_clip_to_pcm(source_path, output_path):
+    """Convert an Edge TTS MP3 to deterministic PCM before timing and mixing."""
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-nostdin", "-loglevel", "error", "-i", str(source_path),
+            "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=FFMPEG_CLIP_CONVERSION_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0 or not output_path.exists() or output_path.stat().st_size < 1000:
+        detail = (result.stderr or '')[-800:]
+        raise RuntimeError(detail or 'FFmpeg មិនអាចរៀបចំសំឡេង TTS សម្រាប់លាយបានទេ។')
 
 def character_voice_filters(tag):
     """Subtle per-role tone shaping so age/role labels do not all sound identical."""
@@ -2507,18 +2537,15 @@ def create_mp3(
             cue['effective_tag'] = effective_voice_tag(cue.get('tag', 'M_ADULT'), voice_mode)
             profile = VOICE_PROFILES.get(cue['effective_tag'], VOICE_PROFILES['M_ADULT'])
             raw_clip = root / f'raw_clip_{index:04d}.mp3'
-            run_async(synthesize(cue['text'], profile, raw_clip))
-            subprocess.run(
-                ["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw_clip),
-                 "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(clips[index])],
-                check=True,
-            )
-            raw_clip.unlink(missing_ok=True)
-            return index, probe_audio_duration(clips[index])
+            try:
+                run_async(synthesize(cue['text'], profile, raw_clip))
+                convert_tts_clip_to_pcm(raw_clip, clips[index])
+                return index, probe_audio_duration(clips[index])
+            finally:
+                raw_clip.unlink(missing_ok=True)
 
-        # TTS calls are independent; render a small bounded group concurrently,
-        # then assemble strictly by the original SRT order below.
-        worker_count = min(6, max(2, total_cues))
+        # A bounded group avoids provider throttling while retaining useful parallelism.
+        worker_count = min(EDGE_TTS_MAX_CONCURRENT_REQUESTS, max(2, total_cues))
         completed = 0
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = [executor.submit(render_clip, index) for index in range(total_cues)]
@@ -2533,7 +2560,7 @@ def create_mp3(
                         f"កំពុងបង្កើតសំឡេងខ្មែរ {completed}/{total_cues}…",
                     )
 
-        command = ['ffmpeg', '-y']
+        command = ['ffmpeg', '-y', '-nostdin']
         for clip in clips:
             command.extend(['-i', str(clip)])
         music_index = None
@@ -2684,9 +2711,20 @@ def create_mp3(
         if progress_callback:
             progress_callback(92, "កំពុងបញ្ចូលសំឡេងទាំងអស់ជាបទ MP3 តែមួយ…")
 
-        result = subprocess.run(command, capture_output=True, text=True, timeout=900)
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=FFMPEG_FINAL_MIX_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError('FFmpeg ចំណាយពេលយូរពេក។ សូមបែងចែក SRT ជាផ្នែកតូចៗ ហើយសាកម្ដងទៀត។') from exc
         if result.returncode != 0:
-            raise RuntimeError("FFmpeg មិនអាចបង្កើតសំឡេង MP3 បានទេ។ សូមពិនិត្យ SRT ហើយសាកម្ដងទៀត។") from None
+            detail = (result.stderr or '')[-800:]
+            raise RuntimeError(
+                f"FFmpeg មិនអាចបង្កើតសំឡេង MP3 បានទេ។ {detail or 'សូមពិនិត្យ SRT ហើយសាកម្ដងទៀត។'}"
+            ) from None
         if not output.exists() or output.stat().st_size < 1000:
             raise RuntimeError('MP3 ត្រូវបានបង្កើត ប៉ុន្តែមិនមានសំឡេងគ្រប់គ្រាន់។')
 

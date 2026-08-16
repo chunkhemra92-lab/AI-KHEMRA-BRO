@@ -1,0 +1,31 @@
+{
+  "test": "AI KHEMRA BRO v6.2 audio integration",
+  "voices": {
+    "M": {
+      "bytes": 27360,
+      "duration_seconds": 4.56,
+      "synthesis_seconds": 4.988,
+      "realtime_factor": 1.094
+    },
+    "F": {
+      "bytes": 28080,
+      "duration_seconds": 4.68,
+      "synthesis_seconds": 4.069,
+      "realtime_factor": 0.87
+    }
+  },
+  "ffmpeg_no_music_overlap_mix": {
+    "bytes": 117549,
+    "duration_seconds": 4.872,
+    "generation_seconds": 4.387,
+    "stereo_channels": 2
+  },
+  "faster_whisper_model_load_seconds": 1.291,
+  "faster_whisper_transcription": {
+    "audio_seconds": 4.56,
+    "transcription_seconds": 0.864,
+    "realtime_factor": 0.19,
+    "segment_count": 1,
+    "nonempty_transcript": true
+  }
+}
