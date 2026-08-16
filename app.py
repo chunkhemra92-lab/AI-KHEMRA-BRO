@@ -28,7 +28,7 @@ from faster_whisper import WhisperModel
 
 APP_VERSION = "6.2"
 
-st.set_page_config(page_title='AI KHEMRA BRO', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
+st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
 st.markdown('''
 <style>
@@ -53,7 +53,7 @@ st.markdown('''
   text-align:center;background:linear-gradient(145deg,#17171d,#0b1018);
   box-shadow:0 0 24px rgba(34,211,238,.24);margin:0 0 18px;
 }
-.hero h1{font-size:44px;margin:0 0 8px;font-weight:900;white-space:nowrap;line-height:1.05}
+.hero h1{font-size:44px;margin:0 0 8px;font-weight:900;white-space:normal;line-height:1.05}.hero .app-version{display:inline-block;margin-left:.16em;font-size:.34em;letter-spacing:.02em;vertical-align:middle;color:#67e8f9;font-weight:800}
 .hero p{margin:0;color:#23c8ef;font-weight:800;letter-spacing:1.5px}
 .section-title{font-size:30px;font-weight:900;margin:22px 0 10px}
 .ok{background:#073d31;border:1px solid #10b981;border-radius:14px;padding:13px 15px;margin:10px 0}
@@ -3692,7 +3692,7 @@ provider_ready = bool(google_translate_api_key) if translation_provider == "Goog
 
 
 st.markdown(
-    '<div class="hero"><h1>AI KHEMRA BRO</h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
+    f'<div class="hero"><h1>AI KHEMRA BRO <span class="app-version">v{APP_VERSION}</span></h1><p>GLOBAL AI DUBBING & SUBTITLING WORKSTATION</p></div>',
     unsafe_allow_html=True,
 )
 
