@@ -554,6 +554,15 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 }
 
 
+/* Modern interaction polish: preserve the existing layout and controls while improving hierarchy and touch comfort. */
+.block-container{max-width:1180px!important;padding-top:1.25rem!important;padding-bottom:2.5rem!important}
+.stButton>button,.stDownloadButton>button{min-height:46px!important;border-radius:14px!important;font-weight:800!important;transition:transform .16s ease,box-shadow .16s ease,filter .16s ease!important}
+.stButton>button:hover,.stDownloadButton>button:hover{transform:translateY(-1px)!important;filter:brightness(1.06)!important;box-shadow:0 8px 20px rgba(8,145,178,.22)!important}
+.stButton>button:focus-visible,.stDownloadButton>button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid rgba(34,211,238,.45)!important;outline-offset:2px!important}
+[data-testid="stFileUploader"],.stTextInput,.stTextArea,.stSelectbox,.stRadio{margin-bottom:.55rem!important}
+[data-testid="stFileUploader"] section{border:1px solid #334155!important;border-radius:16px!important;background:#111c2d!important;padding:12px!important}
+.stAlert{border-radius:14px!important}
+@media(max-width:700px){.block-container{padding-left:.8rem!important;padding-right:.8rem!important;padding-top:.7rem!important}.stButton>button,.stDownloadButton>button{min-height:50px!important}.stTextInput input,.stTextArea textarea{font-size:16px!important}}
 </style>
 ''', unsafe_allow_html=True)
 
