@@ -3316,10 +3316,10 @@ def _copy_card(name, code, expires_text):
         f"""
         <div style="font-family:Arial,sans-serif;background:#0f172a;color:white;border:1px solid #22d3ee;border-radius:14px;padding:14px;margin:4px 0 10px">
           <div style="font-weight:800;margin-bottom:7px">Name: {safe_name}</div>
-          <div style="font-weight:800;margin-bottom:7px">Code: {safe_code}</div>
+          <div style="font-weight:800;margin-bottom:7px">Password / Access Code: {safe_code}</div>
           <div style="opacity:.8;margin-bottom:10px">Expires: {safe_expiry}</div>
           <button onclick="navigator.clipboard.writeText(`{safe_payload}`).then(()=>this.innerText='✅ COPIED')"
-            style="width:100%;padding:11px;border:0;border-radius:9px;background:linear-gradient(90deg,#0284c7,#22d3ee);color:white;font-weight:900">COPY NAME + CODE</button>
+            style="width:100%;padding:11px;border:0;border-radius:9px;background:linear-gradient(90deg,#0284c7,#22d3ee);color:white;font-weight:900">COPY NAME + PASSWORD / CODE</button>
         </div>
         """,
         height=176,
@@ -3327,24 +3327,21 @@ def _copy_card(name, code, expires_text):
 
 
 def admin_dashboard():
-    st.markdown('<div class="hero"><h1>AI KHEMRA BRO</h1><p>PRIVATE OWNER MANAGEMENT</p></div>', unsafe_allow_html=True)
     admin_password = get_admin_password()
-
     if not owner_secrets_configured():
         st.error("Owner Access is locked until private Streamlit Secrets are configured.")
-        st.caption("Configure ADMIN_USERNAME, ADMIN_PASSWORD, COOKIE_SECRET, and LICENSE_PEPPER in the hosting secrets, then restart the app.")
-        if st.button("← ត្រឡប់ទៅ Customer Login", key="close_unconfigured_admin_gate", use_container_width=True):
+        if st.button("← Back to Customer Login", key="close_unconfigured_admin_gate", use_container_width=True):
             leave_private_admin_route()
         return
 
     if not st.session_state.get("admin_authenticated", False):
-        left, center, right = st.columns([1, 1.25, 1])
+        _, center, _ = st.columns([1, 1.25, 1])
         with center:
-            st.markdown("### 👑 ម្ចាស់កម្មវិធី")
+            st.markdown("### Owner Access")
             with st.form("admin_login_form"):
                 username = st.text_input("Username", autocomplete="off")
                 password = st.text_input("Password", type="password", autocomplete="off")
-                submitted = st.form_submit_button("ចូលគ្រប់គ្រង", use_container_width=True)
+                submitted = st.form_submit_button("Sign in", use_container_width=True)
             if submitted:
                 name_ok = hmac.compare_digest(username.strip().casefold(), get_admin_username().casefold())
                 pass_ok = hmac.compare_digest(password, admin_password)
@@ -3355,60 +3352,34 @@ def admin_dashboard():
                     st.rerun()
                 else:
                     _audit("admin_login_failed", username.strip() or "unknown", "failed")
-                    st.error("Username ឬ Password មិនត្រឹមត្រូវ។")
-            if st.button("← ត្រឡប់ទៅ Customer Login", key="close_admin_gate", use_container_width=True):
+                    st.error("Username or password is incorrect.")
+            if st.button("← Back to Customer Login", key="close_admin_gate", use_container_width=True):
                 leave_private_admin_route()
         return
 
-    top1, top2 = st.columns([4, 1])
-    with top1:
-        st.success("👑 Owner បានចូលរួច")
-    with top2:
-        if st.button("ចាកចេញ", key="admin_logout", use_container_width=True):
+    top_left, top_right = st.columns([5, 1])
+    with top_left:
+        st.markdown('<div class="hero"><h1>AI KHEMRA BRO</h1><p>CREATE CUSTOMER ACCESS</p></div>', unsafe_allow_html=True)
+    with top_right:
+        if st.button("Logout", key="admin_logout", use_container_width=True):
             _audit("admin_logout", get_admin_username(), "success")
             leave_private_admin_route()
 
-    # Keep the owner home focused on the three main jobs: summary, creation, and customer management.
-    report_rows = license_rows()
-    report_now = _utcnow()
-    report_total = len(report_rows)
-    report_expired = sum(1 for row in report_rows if report_now >= _parse_iso(row["expires_at"]))
-    report_disabled = sum(1 for row in report_rows if not bool(row["is_active"]))
-    report_online = sum(
-        1 for row in report_rows
-        if bool(row["active_session_hash"]) and row["active_session_last_seen"]
-        and (report_now - _parse_iso(row["active_session_last_seen"])) <= datetime.timedelta(minutes=SESSION_IDLE_MINUTES)
-    )
-    report_expiring_soon = sum(
-        1 for row in report_rows
-        if report_now < _parse_iso(row["expires_at"])
-        and (_parse_iso(row["expires_at"]) - report_now) <= datetime.timedelta(days=7)
-    )
-    st.markdown("## 1️⃣ របាយការណ៍សង្ខេប")
-    report_cols = st.columns(5)
-    report_cols[0].metric("Customer សរុប", report_total)
-    report_cols[1].metric("Active", max(0, report_total - report_expired - report_disabled))
-    report_cols[2].metric("Online", report_online)
-    report_cols[3].metric("ផុតកំណត់", report_expired)
-    report_cols[4].metric("ជិតផុតកំណត់", report_expiring_soon)
-    st.caption("លំដាប់សំខាន់៖ មើលរបាយការណ៍ → បង្កើត Code → គ្រប់គ្រង Customer")
-    st.divider()
-
-    st.markdown("## 2️⃣ បង្កើត Customer")
-    st.caption("Owner ជាអ្នកកំណត់ Access Code ដោយខ្លួនឯង។ Code មួយអាច Login លើ iPhone, Android និង Browser ផ្សេងៗបាន ដោយមិនចងជាមួយឧបករណ៍។")
     with st.form("create_license_form", clear_on_submit=True):
-        customer_name = st.text_input("ឈ្មោះអតិថិជន")
+        customer_name = st.text_input("Customer name", placeholder="Name")
         manual_access_code = st.text_input(
-            "Access Code ដែល Owner ចង់កំណត់",
-            placeholder="ឧ. KHBR-001 ឬ VIP-2026-001",
-            help="អាចប្រើ A-Z, 0-9, - និង _។ មិនមាន Auto Generate ទៀតទេ។",
+            "Password / Access Code",
+            placeholder="KHBR-001 or VIP-2026-001",
+            help="This is the password the customer uses to enter the app.",
         )
-        duration_label = st.selectbox("រយៈពេល", ["7 ថ្ងៃ", "1 ខែ", "3 ខែ", "6 ខែ", "1 ឆ្នាំ"])
-        create_clicked = st.form_submit_button("✅ រក្សាទុក Access Code", use_container_width=True)
+        duration_label = st.selectbox("Duration", ["7 days", "1 month", "3 months", "6 months", "1 year"])
+        create_clicked = st.form_submit_button("Create and Share Code", use_container_width=True)
+
     if create_clicked:
-        days = {"7 ថ្ងៃ": 7, "1 ខែ": 30, "3 ខែ": 90, "6 ខែ": 180, "1 ឆ្នាំ": 365}[duration_label]
+        days = {"7 days": 7, "1 month": 30, "3 months": 90, "6 months": 180, "1 year": 365}[duration_label]
+        plan_label = {"7 days": "7 ថ្ងៃ", "1 month": "1 ខែ", "3 months": "3 ខែ", "6 months": "6 ខែ", "1 year": "1 ឆ្នាំ"}[duration_label]
         try:
-            code, expires, card_until = add_license(customer_name, manual_access_code, days, duration_label)
+            code, expires, card_until = add_license(customer_name, manual_access_code, days, plan_label)
             st.session_state.new_license_name = normalize_customer_name(customer_name)
             st.session_state.new_license_code = code
             st.session_state.new_license_expiry = _iso(expires)
@@ -3421,72 +3392,6 @@ def admin_dashboard():
         expiry_text = _parse_iso(st.session_state.new_license_expiry).astimezone().strftime("%Y-%m-%d %H:%M")
         _copy_card(st.session_state.new_license_name, st.session_state.new_license_code, expiry_text)
 
-    st.divider()
-    st.markdown("## 3️⃣ គ្រប់គ្រងអតិថិជន")
-    search = st.text_input("🔎 ស្វែងរកឈ្មោះ ឬ Code", key="license_search")
-    rows = license_rows(search)
-    if not rows:
-        st.info("មិនទាន់មាន Customer។")
-    now = _utcnow()
-    for row in rows:
-        expiry = _parse_iso(row["expires_at"])
-        expired = now >= expiry
-        online = bool(row["active_session_hash"]) and row["active_session_last_seen"] and (now - _parse_iso(row["active_session_last_seen"])) <= datetime.timedelta(minutes=SESSION_IDLE_MINUTES)
-        status = "ផុតកំណត់" if expired else "បានបិទ" if not row["is_active"] else "Online" if online else "Active"
-        with st.expander(f"{row['customer_name']} • {row['access_code_display']} • {status}"):
-            st.write(f"**ផុតកំណត់:** {expiry.astimezone().strftime('%Y-%m-%d %H:%M')}")
-            st.write(f"**Login:** {row['login_count']} ដង")
-            st.code(f"Name: {row['customer_name']}\nCode: {row['access_code_display']}", language=None)
-            renew_cols = st.columns(5)
-            renew_options = [
-                ("+7 ថ្ងៃ", 7, "7 ថ្ងៃ"),
-                ("+1 ខែ", 30, "1 ខែ"),
-                ("+3 ខែ", 90, "3 ខែ"),
-                ("+6 ខែ", 180, "6 ខែ"),
-                ("+1 ឆ្នាំ", 365, "1 ឆ្នាំ"),
-            ]
-            for renew_col, (button_label, renew_days, plan_name) in zip(renew_cols, renew_options):
-                with renew_col:
-                    if st.button(
-                        button_label,
-                        key=f"renew_{renew_days}_{row['id']}",
-                        use_container_width=True,
-                    ):
-                        renew_license(row["id"], renew_days, plan_name)
-                        st.rerun()
-
-            action_left, action_middle, action_right = st.columns(3)
-            with action_left:
-                label = "បិទ" if row["is_active"] else "បើក"
-                if st.button(label, key=f"toggle_{row['id']}", use_container_width=True):
-                    update_license_status(row["id"], not bool(row["is_active"]))
-                    st.rerun()
-            with action_middle:
-                if st.button("សម្អាត Session ចាស់", key=f"disconnect_{row['id']}", use_container_width=True):
-                    disconnect_license(row["id"])
-                    st.rerun()
-            with action_right:
-                if st.button("🗑️ លុប API Key", key=f"owner_delete_api_{row['id']}", use_container_width=True):
-                    with license_connection() as connection:
-                        connection.execute(
-                            "UPDATE licenses SET saved_api_keys_encrypted='' WHERE id=?",
-                            (int(row["id"]),),
-                        )
-                        connection.commit()
-                    _audit(
-                        "owner_deleted_customer_api_key",
-                        get_admin_username(),
-                        f"{row['customer_name']}|{row['access_code_display']}",
-                    )
-                    st.success("Owner បានលុប API Key របស់ Customer នេះរួច។")
-                    st.rerun()
-
-            with st.expander("⚠️ Advanced Delete"):
-                confirmation = st.text_input("វាយ DELETE ដើម្បីលុប", key=f"delete_confirm_{row['id']}")
-                if st.button("លុបជាអចិន្ត្រៃយ៍", key=f"delete_{row['id']}", disabled=confirmation != "DELETE", use_container_width=True):
-                    delete_license(row["id"]); st.rerun()
-
-    st.caption("ទំព័រនេះបង្ហាញតែការងារសំខាន់ៗរបស់ Owner។")
 initialize_license_database()
 # Compatibility cleanup: remove historical device/session locks created by older versions.
 with license_connection() as _lock_cleanup_connection:
