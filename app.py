@@ -84,6 +84,18 @@ div[data-testid="stTextInput"] [data-baseweb="input"] input{
 div[data-testid="stTextInput"] [data-baseweb="input"] button{
   display:none!important;
 }
+/* Fallback for Streamlit versions whose password button has no BaseWeb selector. */
+div[data-testid="stTextInput"] button{
+  display:none!important;width:0!important;min-width:0!important;padding:0!important;margin:0!important;
+}
+div[data-testid="stTextInput"] > div,
+div[data-testid="stTextInput"] > div > div{
+  background:#182438!important;border-color:#8290a4!important;border-radius:10px!important;
+}
+div[data-testid="stTextInput"] input{
+  background:#182438!important;color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;
+  border-color:#8290a4!important;border-radius:10px!important;
+}
 /* Beautiful mobile tab menu: all 4 tabs stay fully visible. */
 div[data-baseweb="tab-list"]{
   gap:8px!important;
