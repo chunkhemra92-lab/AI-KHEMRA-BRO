@@ -633,12 +633,12 @@ VOICE_PROFILES={
 'GIRL':{'voice':SREYMOM,'rate':'+4%','pitch':'+3Hz','volume':'+5%'},
 'M_YOUNG':{'voice':PISITH,'rate':'+1%','pitch':'+0Hz','volume':'+6%'},
 'F_YOUNG':{'voice':SREYMOM,'rate':'+1%','pitch':'+1Hz','volume':'+6%'},
-'M_ADULT':{'voice':PISITH,'rate':'-3%','pitch':'-3Hz','volume':'+7%'},
-'F_ADULT':{'voice':SREYMOM,'rate':'-2%','pitch':'-1Hz','volume':'+7%'},
+'M_ADULT':{'voice':PISITH,'rate':'-1%','pitch':'+0Hz','volume':'+2%'},
+'F_ADULT':{'voice':SREYMOM,'rate':'-1%','pitch':'+0Hz','volume':'+2%'},
 'M_OLD':{'voice':PISITH,'rate':'-11%','pitch':'-8Hz','volume':'+8%'},
 'F_OLD':{'voice':SREYMOM,'rate':'-10%','pitch':'-6Hz','volume':'+8%'},
-'M_THINK':{'voice':PISITH,'rate':'-7%','pitch':'-4Hz','volume':'+5%'},
-'F_THINK':{'voice':SREYMOM,'rate':'-7%','pitch':'-3Hz','volume':'+5%'},
+'M_THINK':{'voice':PISITH,'rate':'-4%','pitch':'-1Hz','volume':'+0%'},
+'F_THINK':{'voice':SREYMOM,'rate':'-4%','pitch':'-1Hz','volume':'+0%'},
 'NARRATOR_M':{'voice':PISITH,'rate':'-7%','pitch':'-6Hz','volume':'+8%'},
 'NARRATOR_F':{'voice':SREYMOM,'rate':'-6%','pitch':'-4Hz','volume':'+8%'},
 # Backward-compatible labels for older SRT files.
@@ -2448,22 +2448,59 @@ def convert_tts_clip_to_pcm(source_path, output_path):
         raise RuntimeError(detail or 'FFmpeg មិនអាចរៀបចំសំឡេង TTS សម្រាប់លាយបានទេ។')
 
 def character_voice_filters(tag):
-    """Subtle per-role tone shaping so age/role labels do not all sound identical."""
+    """Final role-specific tonal shaping for the four locked audio profiles."""
     mapping = {
-        'BOY': ['equalizer=f=180:t=q:w=1.0:g=-0.8', 'equalizer=f=2900:t=q:w=1.0:g=1.0'],
-        'GIRL': ['equalizer=f=180:t=q:w=1.0:g=-1.0', 'equalizer=f=3000:t=q:w=1.0:g=1.0'],
-        'M_YOUNG': ['equalizer=f=190:t=q:w=1.0:g=0.7', 'equalizer=f=2500:t=q:w=1.0:g=0.5'],
-        'F_YOUNG': ['equalizer=f=220:t=q:w=1.0:g=0.4', 'equalizer=f=2600:t=q:w=1.0:g=0.6'],
-        'M_ADULT': ['equalizer=f=170:t=q:w=1.0:g=1.6', 'equalizer=f=3200:t=q:w=1.0:g=-0.4'],
-        'F_ADULT': ['equalizer=f=220:t=q:w=1.0:g=0.9', 'equalizer=f=3000:t=q:w=1.0:g=0.2'],
-        'M_OLD': ['equalizer=f=140:t=q:w=1.0:g=2.2', 'equalizer=f=2600:t=q:w=1.0:g=-1.0', 'lowpass=f=7200:p=2'],
-        'F_OLD': ['equalizer=f=180:t=q:w=1.0:g=1.7', 'equalizer=f=2800:t=q:w=1.0:g=-0.8', 'lowpass=f=7400:p=2'],
-        'M_THINK': ['equalizer=f=180:t=q:w=1.0:g=1.2', 'equalizer=f=3500:t=q:w=1.0:g=-1.0', 'volume=0.96'],
-        'F_THINK': ['equalizer=f=220:t=q:w=1.0:g=0.8', 'equalizer=f=3600:t=q:w=1.0:g=-0.8', 'volume=0.96'],
-        'NARRATOR_M': ['equalizer=f=150:t=q:w=1.0:g=2.0', 'equalizer=f=2200:t=q:w=1.0:g=0.8'],
-        'NARRATOR_F': ['equalizer=f=200:t=q:w=1.0:g=1.3', 'equalizer=f=2300:t=q:w=1.0:g=0.7'],
+        # Natural dialogue: restrained low-body support and a controlled presence band.
+        'M': ['equalizer=f=180:t=q:w=1.0:g=0.9', 'equalizer=f=3200:t=q:w=1.0:g=-0.8'],
+        'F': ['equalizer=f=210:t=q:w=1.0:g=0.5', 'equalizer=f=3200:t=q:w=1.0:g=-1.1'],
+        # Inner thoughts: darker, gentler, and less sharp before the subtle dream treatment.
+        'M_THINK': ['equalizer=f=200:t=q:w=1.0:g=0.6', 'equalizer=f=3000:t=q:w=1.0:g=-1.4'],
+        'F_THINK': ['equalizer=f=230:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-1.6'],
     }
-    return mapping.get(tag, [])
+    return mapping.get(lock_voice_tag(tag), [])
+
+
+def polish_tts_output(source_path, output_path, voice_tag):
+    """Apply the same four-role polish to standalone Text-to-Speech downloads."""
+    voice_tag = lock_voice_tag(voice_tag)
+    if voice_tag in {'M', 'F'}:
+        filters = [
+            'highpass=f=85:p=2',
+            'lowpass=f=7000:p=2',
+            'equalizer=f=400:t=q:w=1.1:g=-3.2',
+            'equalizer=f=3400:t=q:w=1.0:g=-2.0',
+            'equalizer=f=6500:t=q:w=1.0:g=-2.4',
+            'pan=mono|c0=c0',
+            *character_voice_filters(voice_tag),
+        ]
+    else:
+        filters = [
+            'highpass=f=140:p=2',
+            'lowpass=f=7200:p=2',
+            'equalizer=f=3400:t=q:w=1.0:g=-1.5',
+            'aecho=0.8:0.75:85:0.18',
+            'pan=stereo|c0=c0|c1=c0',
+            'haas=left_delay=2:right_delay=3:side_gain=0.08',
+            'volume=-5dB',
+            *character_voice_filters(voice_tag),
+        ]
+    filters.extend([
+        'acompressor=threshold=-22dB:ratio=1.5:attack=18:release=210:makeup=1.0:knee=4',
+        'alimiter=limit=0.94:attack=8:release=120',
+    ])
+    result = subprocess.run(
+        [
+            'ffmpeg', '-y', '-nostdin', '-loglevel', 'error', '-i', str(source_path),
+            '-af', ','.join(filters), '-c:a', 'libmp3lame', '-ac', '2', '-ar', '48000',
+            '-b:a', '128k', str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=FFMPEG_CLIP_CONVERSION_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0 or not output_path.exists() or output_path.stat().st_size < 1000:
+        detail = (result.stderr or '')[-800:]
+        raise RuntimeError(detail or 'FFmpeg មិនអាចកែសំឡេង TTS បានទេ។')
 
 
 def probe_audio_duration(path):
@@ -2634,12 +2671,13 @@ def create_mp3(
                 parts.extend([
                     # Natural inner voice: close and human, with only a subtle
                     # binaural offset; deliberately no audible echo or hall tail.
-                    'highpass=f=180:p=2',
-                    'lowpass=f=11500:p=2',
-                    'equalizer=f=7000:t=q:w=1.0:g=-1.0',
+                    'highpass=f=150:p=2',
+                    'lowpass=f=10500:p=2',
+                    'equalizer=f=6500:t=q:w=1.0:g=-0.8',
+                    'aecho=0.8:0.75:85:0.18',
                     'pan=stereo|c0=c0|c1=c0',
-                    'haas=left_delay=0.8:right_delay=1.2:side_gain=0.18',
-                    'volume=-8dB',
+                    'haas=left_delay=1.2:right_delay=1.8:side_gain=0.08',
+                    'volume=-5dB',
                 ])
             else:
                 # Track 1: dry, centered dialogue with a strict anti-boxiness cut.
@@ -4149,7 +4187,7 @@ with tab_text_speech:
     plain_text = st.text_area("Khmer Text", height=SRT_INPUT_HEIGHT, key="plain_text_input")
     voice_choice = st.selectbox(
         "Voice",
-        ["M", "F"],
+        ["M", "F", "M_THINK", "F_THINK"],
         key="plain_voice",
     )
     if st.button("🔊 Generate Voice", key="plain_voice_btn"):
@@ -4158,9 +4196,11 @@ with tab_text_speech:
         else:
             try:
                 with tempfile.TemporaryDirectory() as folder:
+                    raw_output = Path(folder) / "speech_raw.mp3"
                     output = Path(folder) / "speech.mp3"
                     voice_profile = LOCKED_VOICE_PROFILES[voice_choice]
-                    run_async(synthesize(plain_text.strip(), voice_profile, output))
+                    run_async(synthesize(plain_text.strip(), voice_profile, raw_output))
+                    polish_tts_output(raw_output, output, voice_choice)
                     st.session_state.text_tab_audio_bytes = output.read_bytes()
                 st.success("✅ បង្កើតសំឡេងរួចរាល់។")
             except Exception as exc:
