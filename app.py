@@ -682,8 +682,10 @@ MANDATORY NO-SKIP RULES:
 
 OUTPUT RULES:
 - Return exactly one object for every supplied cue ID, in the same order.
-- Every text value must be fluent Khmer suitable for professional movie subtitles and dubbing.
-- JSON only. No markdown fences, headings, comments, or explanation.
+- Every text value must be fluent, natural spoken Khmer suitable for professional movie subtitles and dubbing.
+- Use only M, F, M_THINK, or F_THINK as the internal voice tag.
+- Preserve timestamps, cue count, cue order, and every audible meaning.
+- JSON only for the model response; the application renders the final SRT in a copyable code block.
 """
 
 ANALYZE_PROMPT = """You are a Chinese-drama Khmer dubbing continuity editor.
@@ -1975,7 +1977,7 @@ You are an Expert Subtitler and Dubbing Translator for AI KHEMRA BRO.
 Automatically identify the language of every SOURCE line, then translate it into {target_details['name']} for movie-dialogue SRT. Never ask the user to identify the source language.
 
 THE FOLLOWING SIX RULES ARE MANDATORY:
-1. NATURAL SPOKEN TARGET LANGUAGE: Never translate word-for-word. Use smooth, everyday speech natural to the selected target language. When the target is Khmer, use appropriate emotion particles such as ណា, ណ៎, ហ្មង, តើ, អញ្ចឹង, វើយ, ហាស, ចា៎, or ចុះ only when the scene supports them.
+1. NATURAL SPOKEN TARGET LANGUAGE: Never translate word-for-word or in dry written language. For Khmer, use smooth everyday speech that Cambodian people naturally say, with emotion particles such as ណា, ណ៎, ហ្មង, តើ, អញ្ចឹង, វើយ, ហាស, ចា៎, or ចុះ only when the scene supports them.
 2. MATCH THE ACTOR: Choose pronouns and forms of address that fit each speaker's age, status, relationship, and scene context, including បង/អូន, ឯង/អញ, ខ្ញុំ/លោក, ពួកម៉ាក, សម្លាញ់, and អា when appropriate.
 3. EMOTIONAL DEPTH: Preserve anger, humour, tears, warmth, sarcasm, fear, shock, romance, and hidden meaning. Recreate idioms and wordplay naturally in Khmer instead of translating them literally.
 4. SUBTITLE TIMING: Keep the original ID and timestamps unchanged. Each line must be concise enough for MAX_WORDS and its exact time slot, but never delete a spoken meaning, short reply, name, number, negation, filler, cry, or reaction.
@@ -3744,6 +3746,9 @@ with tab_video:
         key="main_srt_editor",
     )
     st.session_state.srt_text = st.session_state.main_srt_editor
+    if st.session_state.srt_text.strip():
+        st.caption("SRT សម្រាប់ Copy ទៅប្រើបន្ត")
+        st.code(st.session_state.srt_text, language="srt")
 
     # Keep both SRT action buttons on one row directly below the editor,
     # including portrait and landscape mobile screens.
@@ -3898,7 +3903,7 @@ with tab_video:
 
 with tab_translate:
     st.header("AI Subtitle Translator")
-    st.info("បិទភ្ជាប់ Source SRT ហើយបកប្រែទៅ Khmer SRT ដោយរក្សា timestamp ដើម។")
+    st.info("បិទភ្ជាប់ Source SRT ហើយបកប្រែទៅ Khmer SRT ដោយរក្សា timestamp ដើម។ លទ្ធផលនឹងបង្ហាញជាកូដ SRT សម្រាប់ Copy។")
     source_srt = st.text_area("Source SRT", height=SRT_INPUT_HEIGHT, key="translator_source")
     if st.button("🌐 Translate to Khmer", key="translate_btn"):
         if not source_srt.strip():
@@ -3943,6 +3948,7 @@ with tab_translate:
                 st.session_state.srt_text = "\n\n".join(blocks)
                 st.session_state.pending_editor_update = st.session_state.srt_text
                 st.success("✅ បកប្រែរួចរាល់ និងរក្សា Timestamp ដើម។")
+                st.code(st.session_state.srt_text, language="srt")
             except Exception as exc:
                 st.error(f"❌ {exc}")
 
