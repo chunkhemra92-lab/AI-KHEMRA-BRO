@@ -3368,7 +3368,7 @@ def admin_dashboard():
             _audit("admin_logout", get_admin_username(), "success")
             leave_private_admin_route()
 
-    # Keep owner work in one predictable order: summary, creation, management, audit.
+    # Keep the owner home focused on the three main jobs: summary, creation, and customer management.
     report_rows = license_rows()
     report_now = _utcnow()
     report_total = len(report_rows)
@@ -3391,7 +3391,7 @@ def admin_dashboard():
     report_cols[2].metric("Online", report_online)
     report_cols[3].metric("ផុតកំណត់", report_expired)
     report_cols[4].metric("ជិតផុតកំណត់", report_expiring_soon)
-    st.caption("លំដាប់ប្រើប្រាស់៖ មើលរបាយការណ៍ → បង្កើត Code → គ្រប់គ្រង Customer → ពិនិត្យ Audit Log")
+    st.caption("លំដាប់សំខាន់៖ មើលរបាយការណ៍ → បង្កើត Code → គ្រប់គ្រង Customer")
     st.divider()
 
     st.markdown("## 2️⃣ បង្កើត Customer")
@@ -3486,14 +3486,7 @@ def admin_dashboard():
                 if st.button("លុបជាអចិន្ត្រៃយ៍", key=f"delete_{row['id']}", disabled=confirmation != "DELETE", use_container_width=True):
                     delete_license(row["id"]); st.rerun()
 
-    st.divider()
-    with st.expander("4️⃣ 🧾 Audit Log", expanded=False):
-        with license_connection() as connection:
-            logs = connection.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100").fetchall()
-        for log in logs:
-            st.caption(f"{log['event_at']} • {log['event_type']} • {log['actor']} • {log['details']}")
-
-
+    st.caption("ទំព័រនេះបង្ហាញតែការងារសំខាន់ៗរបស់ Owner។")
 initialize_license_database()
 # Compatibility cleanup: remove historical device/session locks created by older versions.
 with license_connection() as _lock_cleanup_connection:
