@@ -565,6 +565,31 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 @media(max-width:700px){.block-container{padding-left:.8rem!important;padding-right:.8rem!important;padding-top:.7rem!important}.stButton>button,.stDownloadButton>button{min-height:50px!important}.stTextInput input,.stTextArea textarea{font-size:16px!important}}
 .stFormSubmitButton button{background:linear-gradient(90deg,#0284c7,#22d3ee)!important;color:#ffffff!important;border:1px solid #67e8f9!important;min-height:52px!important;font-weight:900!important;text-shadow:0 1px 2px rgba(0,0,0,.35)!important}
 .stFormSubmitButton button:hover{filter:brightness(1.08)!important;box-shadow:0 8px 20px rgba(8,145,178,.25)!important}
+/* Compact login composition based on the clean reference layout. */
+.st-key-public_login_wrap{width:min(100%,760px)!important;margin:0 auto!important;padding:0 12px 28px!important}
+.login-hero-card{margin:10px auto 24px!important;padding:30px 24px 22px!important;border-width:2px!important;border-radius:24px!important;box-shadow:0 0 22px rgba(216,28,255,.34),0 16px 30px rgba(0,0,0,.22)!important}
+.login-hero-card h1{font-size:clamp(32px,7vw,52px)!important}
+.login-tagline{margin:16px 0 0!important;font-size:clamp(14px,3vw,21px)!important;letter-spacing:.55px!important}
+.login-khmer{margin:13px 0 0!important;font-size:clamp(15px,3.3vw,22px)!important;line-height:1.35!important}
+.social-split{gap:14px!important;margin:22px 0 0!important}
+.social-split a{min-height:58px!important;border-radius:12px!important;font-size:16px!important;gap:8px!important}
+.social-icon{width:32px!important;height:32px!important;flex-basis:32px!important;font-size:22px!important}
+.login-form-title{margin:0 0 14px!important;font-size:clamp(30px,6vw,42px)!important}
+.st-key-customer_login_box{border-radius:14px!important;padding:28px 24px 24px!important;background:#101621!important;box-shadow:0 10px 24px rgba(0,0,0,.14)!important}
+.st-key-customer_login_box label,.st-key-customer_login_box label p{font-size:15px!important}
+.st-key-customer_login_box input{min-height:50px!important;border-radius:10px!important;font-size:16px!important}
+.st-key-customer_login_box [data-testid="stFormSubmitButton"] button{min-height:50px!important;margin-top:10px!important;border-radius:11px!important;font-size:16px!important}
+.login-help{margin:16px 4px 0!important;font-size:14px!important;line-height:1.5!important}
+@media(max-width:700px){
+  .st-key-public_login_wrap{padding-left:10px!important;padding-right:10px!important}
+  .login-hero-card{margin:8px auto 22px!important;padding:27px 16px 20px!important;border-radius:22px!important}
+  .login-hero-card h1{font-size:31px!important}
+  .login-tagline{font-size:14px!important;margin-top:14px!important}
+  .login-khmer{font-size:15px!important;margin-top:11px!important}
+  .social-split{gap:10px!important;margin-top:19px!important}
+  .social-split a{min-height:54px!important;font-size:14px!important}
+  .st-key-customer_login_box{padding:24px 18px 22px!important}
+}
 </style>
 ''', unsafe_allow_html=True)
 
