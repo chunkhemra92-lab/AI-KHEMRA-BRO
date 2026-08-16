@@ -4083,7 +4083,7 @@ with tab_srt_speech:
 
 with tab_text_speech:
     st.header("Text → Speech")
-    plain_text = st.text_area("Khmer Text", height=260, key="plain_text_input")
+    plain_text = st.text_area("Khmer Text", height=SRT_INPUT_HEIGHT, key="plain_text_input")
     voice_choice = st.selectbox(
         "Voice",
         ["M", "F"],
