@@ -2406,14 +2406,24 @@ def create_mp3(
         if progress_callback:
             progress_callback(2, "កំពុងរៀបចំសំឡេងតួអង្គ…")
 
-        clips = [root / f'clip_{index:04d}.mp3' for index in range(total_cues)]
+        # Normalize temporary clips before probing/mixing. Edge TTS may return
+        # VBR MP3 at 24 kHz/48 kbps; probing those files can estimate duration
+        # from bitrate and make large SRT mixes fail. PCM WAV is deterministic.
+        clips = [root / f'clip_{index:04d}.wav' for index in range(total_cues)]
         clip_durations = [0.0] * total_cues
 
         def render_clip(index):
             cue = cues[index]
             cue['effective_tag'] = effective_voice_tag(cue.get('tag', 'M_ADULT'), voice_mode)
             profile = VOICE_PROFILES.get(cue['effective_tag'], VOICE_PROFILES['M_ADULT'])
-            run_async(synthesize(cue['text'], profile, clips[index]))
+            raw_clip = root / f'raw_clip_{index:04d}.mp3'
+            run_async(synthesize(cue['text'], profile, raw_clip))
+            subprocess.run(
+                ["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw_clip),
+                 "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(clips[index])],
+                check=True,
+            )
+            raw_clip.unlink(missing_ok=True)
             return index, probe_audio_duration(clips[index])
 
         # TTS calls are independent; render a small bounded group concurrently,
