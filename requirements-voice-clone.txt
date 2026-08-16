@@ -1,4 +1,0 @@
-# Optional reference-voice cloning backend
-# Requires a machine with a compatible NVIDIA GPU for practical inference.
-voxcpm
-soundfile>=0.12.1
