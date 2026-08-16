@@ -535,7 +535,7 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer [data-testid="stTextArea"] textarea{min-height:92px!important;border-radius:14px!important;box-shadow:inset 0 0 0 1px rgba(148,163,184,.16)!important}
 .st-key-settings_drawer [data-testid="stSelectbox"] > div{border-radius:14px!important}
 .st-key-settings_drawer .stCaption{color:#b9c8dc!important;line-height:1.48!important}
-.st-key-main_srt_editor textarea,.st-key-translator_source textarea,.st-key-speech_srt_input textarea{min-height:300px!important;height:300px!important;border-radius:16px!important;background:#1c2a3d!important}
+.st-key-main_srt_editor textarea,.st-key-translator_source textarea,.st-key-speech_srt_input textarea,.st-key-plain_text_input textarea{min-height:300px!important;height:300px!important;border-radius:16px!important;background:#1c2a3d!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important;width:50px!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
 [data-testid="stElementContainer"]:has(.st-key-owner_trigger_container),[data-testid="stElementContainer"]:has(.st-key-settings_drawer_toggle){height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
 .st-key-settings_drawer_toggle button{width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
