@@ -2466,22 +2466,24 @@ def polish_tts_output(source_path, output_path, voice_tag):
     if voice_tag in {'M', 'F'}:
         filters = [
             'highpass=f=85:p=2',
-            'lowpass=f=7000:p=2',
+            'lowpass=f=6200:p=2',
             'equalizer=f=400:t=q:w=1.1:g=-3.2',
-            'equalizer=f=3400:t=q:w=1.0:g=-2.0',
-            'equalizer=f=6500:t=q:w=1.0:g=-2.4',
+            'equalizer=f=3400:t=q:w=1.0:g=-1.6',
+            'equalizer=f=4700:t=q:w=1.1:g=-2.3',
+            'equalizer=f=6200:t=q:w=1.0:g=-2.0',
             'pan=mono|c0=c0',
             *character_voice_filters(voice_tag),
         ]
     else:
         filters = [
             'highpass=f=140:p=2',
-            'lowpass=f=7200:p=2',
-            'equalizer=f=3400:t=q:w=1.0:g=-1.5',
-            'aecho=0.8:0.75:85:0.18',
+            'lowpass=f=6800:p=2',
+            'equalizer=f=3400:t=q:w=1.0:g=-1.8',
+            'equalizer=f=4800:t=q:w=1.1:g=-1.4',
+            'aecho=0.8:0.82:120:0.24',
             'pan=stereo|c0=c0|c1=c0',
             'haas=left_delay=2:right_delay=3:side_gain=0.08',
-            'volume=-5dB',
+            'volume=-8dB',
             *character_voice_filters(voice_tag),
         ]
     filters.extend([
@@ -2672,21 +2674,23 @@ def create_mp3(
                     # Natural inner voice: close and human, with only a subtle
                     # binaural offset; deliberately no audible echo or hall tail.
                     'highpass=f=150:p=2',
-                    'lowpass=f=10500:p=2',
-                    'equalizer=f=6500:t=q:w=1.0:g=-0.8',
-                    'aecho=0.8:0.75:85:0.18',
+                    'lowpass=f=9800:p=2',
+                    'equalizer=f=4300:t=q:w=1.1:g=-1.2',
+                    'equalizer=f=6500:t=q:w=1.0:g=-1.0',
+                    'aecho=0.8:0.82:120:0.24',
                     'pan=stereo|c0=c0|c1=c0',
                     'haas=left_delay=1.2:right_delay=1.8:side_gain=0.08',
-                    'volume=-5dB',
+                    'volume=-8dB',
                 ])
             else:
                 # Track 1: dry, centered dialogue with a strict anti-boxiness cut.
                 parts.extend([
                     'highpass=f=100:p=2',
-                    'lowpass=f=11500:p=2',
+                    'lowpass=f=7800:p=2',
                     'equalizer=f=400:t=q:w=1.0:g=-5',
-                    'equalizer=f=3000:t=q:w=1.0:g=1.5',
-                    'equalizer=f=7500:t=q:w=1.0:g=-1.5',
+                    'equalizer=f=3000:t=q:w=1.0:g=0.8',
+                    'equalizer=f=4500:t=q:w=1.1:g=-1.6',
+                    'equalizer=f=7200:t=q:w=1.0:g=-2.6',
                     'pan=mono|c0=c0',
                     'volume=-4dB',
                 ])
