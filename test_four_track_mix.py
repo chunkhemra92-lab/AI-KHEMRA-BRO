@@ -12,8 +12,8 @@ with tempfile.TemporaryDirectory() as d:
         '-f', 'lavfi', '-i', 'sine=frequency=660:duration=2',
         '-f', 'lavfi', '-i', 'anoisesrc=color=white:duration=2',
         '-filter_complex',
-        '[0:a]highpass=f=100,equalizer=f=400:t=q:w=1:g=-5,equalizer=f=3000:t=q:w=1:g=1.5,treble=g=2:f=11000,pan=mono|c0=c0,volume=-4dB[direct];'
-        '[1:a]highpass=f=180,treble=g=4:f=10000,pan=stereo|c0=c0|c1=c0,haas=left_delay=2.5:right_delay=3.5:side_gain=1.25,extrastereo=m=1.8,aecho=0.65:0.35:45|300|650|1100|1800|2600|3200:0.32|0.24|0.18|0.13|0.09|0.06|0.04,volume=-7dB[thought];'
+        '[0:a]highpass=f=100,equalizer=f=400:t=q:w=1:g=-5,equalizer=f=3000:t=q:w=1:g=1.5,equalizer=f=7500:t=q:w=1:g=-1.5,pan=mono|c0=c0,volume=-4dB[direct];'
+        '[1:a]highpass=f=180,lowpass=f=11500,equalizer=f=7000:t=q:w=1:g=-1,pan=stereo|c0=c0|c1=c0,haas=left_delay=0.8:right_delay=1.2:side_gain=0.18,volume=-8dB[thought];'
         '[direct][thought]amix=inputs=2:duration=longest:normalize=0,asplit=2[voice_for_sc][voice_for_mix];'
         '[2:a]volume=-24dB,equalizer=f=1800:t=q:w=1:g=-4[music];'
         '[music][voice_for_sc]sidechaincompress=threshold=0.025:ratio=8:attack=12:release=300:makeup=1:link=average[music_ducked];'

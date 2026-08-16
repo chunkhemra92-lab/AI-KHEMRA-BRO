@@ -2494,23 +2494,23 @@ def create_mp3(
             if is_thought:
                 # Track 2: wide, airy, reverberant inner monologue.
                 parts.extend([
+                    # Natural inner voice: close and human, with only a subtle
+                    # binaural offset; deliberately no audible echo or hall tail.
                     'highpass=f=180:p=2',
-                    'lowpass=f=14500:p=2',
-                    'treble=g=4:f=10000',
+                    'lowpass=f=11500:p=2',
+                    'equalizer=f=7000:t=q:w=1.0:g=-1.0',
                     'pan=stereo|c0=c0|c1=c0',
-                    'haas=left_delay=2.5:right_delay=3.5:side_gain=1.25',
-                    'extrastereo=m=1.8',
-                    'aecho=0.65:0.35:45|300|650|1100|1800|2600|3200:0.32|0.24|0.18|0.13|0.09|0.06|0.04',
-                    'volume=-7dB',
+                    'haas=left_delay=0.8:right_delay=1.2:side_gain=0.18',
+                    'volume=-8dB',
                 ])
             else:
                 # Track 1: dry, centered dialogue with a strict anti-boxiness cut.
                 parts.extend([
                     'highpass=f=100:p=2',
-                    'lowpass=f=14500:p=2',
+                    'lowpass=f=11500:p=2',
                     'equalizer=f=400:t=q:w=1.0:g=-5',
                     'equalizer=f=3000:t=q:w=1.0:g=1.5',
-                    'treble=g=2:f=11000',
+                    'equalizer=f=7500:t=q:w=1.0:g=-1.5',
                     'pan=mono|c0=c0',
                     'volume=-4dB',
                 ])
@@ -2565,7 +2565,7 @@ def create_mp3(
             + f'amix=inputs={len(mix_inputs)}:duration=longest:dropout_transition=0:normalize=0,'
               'acompressor=threshold=-18dB:ratio=1.35:attack=18:release=240:makeup=1.0:knee=5,'
               'alimiter=limit=0.94:attack=8:release=150,'
-              'loudnorm=I=-16:TP=-1.5:LRA=7,'
+              'loudnorm=I=-14:TP=-1.5:LRA=7,'
               f'apad=whole_dur={total:.3f},atrim=0:{total:.3f}[out]'
         )
 
