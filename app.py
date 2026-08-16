@@ -2613,10 +2613,16 @@ def create_mp3(
 
         # Track 1 + Track 2 voice bus. Direct cues are centered and dry;
         # thought cues remain wide and reverberant inside this stereo bus.
-        filters.append(
+        voice_bus = (
             ''.join(labels)
-            + f'amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0,asplit=2[voice_for_sc][voice_for_mix]'
+            + f'amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0'
         )
+        if music_index is not None:
+            # Split only when the sidechain compressor needs a separate voice bus.
+            filters.append(voice_bus + ',asplit=2[voice_for_sc][voice_for_mix]')
+        else:
+            # Without music, an unused asplit output makes FFmpeg reject the graph.
+            filters.append(voice_bus + '[voice_for_mix]')
         mix_inputs = ['[voice_for_mix]']
         if music_index is not None:
             filters.append(
