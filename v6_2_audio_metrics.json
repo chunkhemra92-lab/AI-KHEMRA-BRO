@@ -4,27 +4,27 @@
     "M": {
       "bytes": 27360,
       "duration_seconds": 4.56,
-      "synthesis_seconds": 4.988,
-      "realtime_factor": 1.094
+      "synthesis_seconds": 4.249,
+      "realtime_factor": 0.932
     },
     "F": {
       "bytes": 28080,
       "duration_seconds": 4.68,
-      "synthesis_seconds": 4.069,
-      "realtime_factor": 0.87
+      "synthesis_seconds": 2.883,
+      "realtime_factor": 0.616
     }
   },
-  "ffmpeg_no_music_overlap_mix": {
-    "bytes": 117549,
-    "duration_seconds": 4.872,
-    "generation_seconds": 4.387,
+  "four_role_no_music_overlap_mix": {
+    "bytes": 201645,
+    "duration_seconds": 8.376,
+    "generation_seconds": 15.29,
     "stereo_channels": 2
   },
-  "faster_whisper_model_load_seconds": 1.291,
+  "faster_whisper_model_load_seconds": 1.732,
   "faster_whisper_transcription": {
     "audio_seconds": 4.56,
-    "transcription_seconds": 0.864,
-    "realtime_factor": 0.19,
+    "transcription_seconds": 0.98,
+    "realtime_factor": 0.215,
     "segment_count": 1,
     "nonempty_transcript": true
   }

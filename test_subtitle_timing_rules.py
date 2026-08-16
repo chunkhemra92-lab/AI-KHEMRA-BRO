@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 SOURCE = Path("app.py").read_text(encoding="utf-8")
 TREE = ast.parse(SOURCE)
-REQUIRED = {"_standardize_whisper_segments", "atempo_chain", "_voice_tag_key", "compact_voice_tag", "is_known_voice_tag", "parse_srt"}
+REQUIRED = {"_standardize_whisper_segments", "atempo_chain", "_voice_tag_key", "compact_voice_tag", "is_known_voice_tag", "lock_voice_tag", "parse_srt"}
 NODES = [node for node in TREE.body if isinstance(node, ast.FunctionDef) and node.name in REQUIRED]
-namespace = {"re": re}
+namespace = {"re": re, "LOCKED_VOICE_TAGS": frozenset({"M", "F", "M_THINK", "F_THINK"})}
 exec(compile(ast.Module(body=NODES, type_ignores=[]), "app.py", "exec"), namespace)
 
 

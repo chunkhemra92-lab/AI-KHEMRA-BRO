@@ -27,6 +27,7 @@ REQUIRED_FUNCTIONS = {
     "_voice_tag_key",
     "compact_voice_tag",
     "is_known_voice_tag",
+    "lock_voice_tag",
     "normalize_dialogue",
     "prepare_tts_text",
     "synthesize",
@@ -46,6 +47,14 @@ SREYMOM = "km-KH-SreymomNeural"
 VOICE_PROFILES = {
     "M_ADULT": {"voice": PISITH, "rate": "-3%", "pitch": "-3Hz", "volume": "+7%"},
     "F_ADULT": {"voice": SREYMOM, "rate": "-2%", "pitch": "-1Hz", "volume": "+7%"},
+    "M_THINK": {"voice": PISITH, "rate": "-7%", "pitch": "-4Hz", "volume": "+5%"},
+    "F_THINK": {"voice": SREYMOM, "rate": "-7%", "pitch": "-3Hz", "volume": "+5%"},
+}
+LOCKED_VOICE_PROFILES = {
+    "M": VOICE_PROFILES["M_ADULT"],
+    "F": VOICE_PROFILES["F_ADULT"],
+    "M_THINK": VOICE_PROFILES["M_THINK"],
+    "F_THINK": VOICE_PROFILES["F_THINK"],
 }
 
 namespace = {
@@ -68,6 +77,8 @@ namespace = {
     "ThreadPoolExecutor": ThreadPoolExecutor,
     "VOICE_FADE_IN_SECONDS": 0.045,
     "VOICE_FADE_OUT_SECONDS": 0.070,
+    "LOCKED_VOICE_TAGS": frozenset({"M", "F", "M_THINK", "F_THINK"}),
+    "LOCKED_VOICE_PROFILES": LOCKED_VOICE_PROFILES,
     "VOICE_PROFILES": VOICE_PROFILES,
 }
 selected_nodes = [
@@ -122,12 +133,20 @@ def main() -> None:
             }
 
         overlap_srt = """1
-00:00:00,000 --> 00:00:03,000
-[M] សួស្តី ខ្ញុំកំពុងសាកល្បងសំឡេងខ្មែរ។
+00:00:00,000 --> 00:00:02,800
+[M] សួស្តី ខ្ញុំកំពុងសាកល្បងសំឡេងប្រុស។
 
 2
-00:00:01,300 --> 00:00:04,500
-[F] ខ្ញុំក៏កំពុងសាកល្បងសំឡេងផងដែរ។"""
+00:00:01,300 --> 00:00:04,200
+[F] ខ្ញុំកំពុងសាកល្បងសំឡេងស្រីផងដែរ។
+
+3
+00:00:04,500 --> 00:00:06,800
+[M_THINK] ខ្ញុំកំពុងគិតក្នុងចិត្ត។
+
+4
+00:00:05,400 --> 00:00:08,000
+[F_THINK] ខ្ញុំក៏គិតក្នុងចិត្តដែរ។"""
         started = time.perf_counter()
         mixed_audio = create_mp3(overlap_srt, target_language="Khmer")
         mix_elapsed = time.perf_counter() - started
@@ -135,9 +154,9 @@ def main() -> None:
         mixed_path.write_bytes(mixed_audio)
         mixed_duration = probe_audio_duration(mixed_path)
         assert len(mixed_audio) > 1000, "No-music mix output is unexpectedly small"
-        assert mixed_duration >= 4.75, "Overlap mix did not preserve the final SRT cue window"
+        assert mixed_duration >= 8.25, "Four-role overlap mix did not preserve the final SRT cue window"
         assert ffprobe_channels(mixed_path) == 2, "Final mix must remain stereo"
-        metrics["ffmpeg_no_music_overlap_mix"] = {
+        metrics["four_role_no_music_overlap_mix"] = {
             "bytes": len(mixed_audio),
             "duration_seconds": round(mixed_duration, 3),
             "generation_seconds": round(mix_elapsed, 3),

@@ -648,10 +648,16 @@ VOICE_PROFILES={
 'OLD_F':{'voice':SREYMOM,'rate':'-8%','pitch':'-3Hz','volume':'+8%'}
 }
 
-# Compact voice tags are the only labels written into generated SRT files.
-# Detailed legacy tags remain supported on input and map to the requested
-# male, female, and inner-thought voices without changing the application UI.
+# The audio engine is intentionally locked to these four public roles only.
+# Legacy input labels are normalized to one of them before any audio is rendered.
 COMPACT_VOICE_TAGS = ("M", "F", "M_THINK", "F_THINK")
+LOCKED_VOICE_TAGS = frozenset(COMPACT_VOICE_TAGS)
+LOCKED_VOICE_PROFILES = {
+    "M": VOICE_PROFILES["M_ADULT"],
+    "F": VOICE_PROFILES["F_ADULT"],
+    "M_THINK": VOICE_PROFILES["M_THINK"],
+    "F_THINK": VOICE_PROFILES["F_THINK"],
+}
 
 
 def _voice_tag_key(tag):
@@ -679,6 +685,12 @@ def is_known_voice_tag(tag):
     }
 
 
+def lock_voice_tag(tag):
+    """Map any accepted label to exactly one of the four audio-engine roles."""
+    locked_tag = compact_voice_tag(tag)
+    return locked_tag if locked_tag in LOCKED_VOICE_TAGS else "M"
+
+
 # Smooth-dubbing controls: gentle fades remove clicks/cuts when speaker labels change.
 VOICE_FADE_IN_SECONDS = 0.045
 VOICE_FADE_OUT_SECONDS = 0.070
@@ -698,19 +710,22 @@ Return a JSON array only. Each object must contain exactly:
 {"id": integer, "tag": string, "text": string}
 
 Allowed tags:
-BOY, GIRL, M_YOUNG, F_YOUNG, M_ADULT, F_ADULT, M_OLD, F_OLD, M_THINK, F_THINK, NARRATOR_M, NARRATOR_F
+M, F, M_THINK, F_THINK
+
+FOUR-VOICE LABEL LOCK:
+- M = all normal male dialogue, including male narration.
+- F = all normal female dialogue, including female narration.
+- M_THINK = only an unheard male inner thought or internal monologue.
+- F_THINK = only an unheard female inner thought or internal monologue.
 
 SPEAKER AND CHARACTER RULES:
 - Assign the tag to the person who is actually speaking, not merely the person visible on screen.
 - Dialogue from a distant, off-camera, quiet, echoing, or partially covered speaker is still real dialogue. Translate it normally and completely; never shorten or omit it merely because the speaker sounds far away.
 - Do not change meaning, pronouns, or speaker identity because a voice is louder, quieter, nearer, farther, muffled, or reverberant.
-- Keep each recurring character on a consistent gender/age/role tag across nearby cues. Never switch a character's label merely because the emotion, volume, camera angle, or speaking style changes.
-- Before assigning a new tag, compare with the preceding and following cues. Change the tag only when the actual speaker changes or clear video/audio evidence proves a different age/gender/role.
-- Use BOY/GIRL for children, M_YOUNG/F_YOUNG for teenagers or young adults, M_ADULT/F_ADULT for ordinary adults, and M_OLD/F_OLD for elderly speakers.
-- Choose age from the actual voice and visible character context; do not guess an elderly or child label from clothing alone.
-- Use M_THINK or F_THINK only for an unheard inner thought or internal monologue.
-- Use NARRATOR tags only for true off-screen narration, not for a character's thought.
-- Use BOY/GIRL and M_OLD/F_OLD only when age is clearly supported; otherwise prefer M_YOUNG/F_YOUNG or M_ADULT/F_ADULT.
+- Keep each recurring character on a consistent one of the four locked tags across nearby cues. Never switch a character's label merely because the emotion, volume, camera angle, or speaking style changes.
+- Before assigning a new tag, compare with the preceding and following cues. Change the tag only when the actual speaker changes, or when clear audio/video evidence changes male/female identity or confirms an unheard inner thought.
+- Use M or F for every ordinary spoken line regardless of age, rank, narration style, emotion, distance, or loudness.
+- Use M_THINK or F_THINK only for an unheard inner thought or internal monologue; never use a thought tag simply because a character speaks softly.
 
 PROFESSIONAL KHMER TRANSLATION RULES:
 - Translate into smooth, natural spoken Khmer that Cambodian people actually use in everyday conversation and movie dialogue.
@@ -2358,7 +2373,7 @@ def parse_srt(srt_text):
         if not match: continue
         dialogue=' '.join(lines[idx+1:]).strip(); tag_match=tag_re.match(dialogue)
         raw_tag = tag_match.group(1).strip() if tag_match else ''
-        tag = compact_voice_tag(raw_tag) if is_known_voice_tag(raw_tag) else 'M_ADULT'
+        tag = lock_voice_tag(raw_tag) if is_known_voice_tag(raw_tag) else 'M'
         if tag_match and is_known_voice_tag(raw_tag): dialogue=dialogue[tag_match.end():].strip()
         if dialogue:
             start_ms=to_ms(match.groups()[:4]); end_ms=to_ms(match.groups()[4:])
@@ -2484,11 +2499,12 @@ def atempo_chain(speed):
 
 
 def effective_voice_tag(tag, voice_mode):
+    """Resolve every cue to one of the four locked production voice profiles."""
     if voice_mode == "All Male":
-        return "M_ADULT"
+        return "M"
     if voice_mode == "All Female":
-        return "F_ADULT"
-    return tag if tag in VOICE_PROFILES else "M_ADULT"
+        return "F"
+    return lock_voice_tag(tag)
 
 
 def create_mp3(
@@ -2535,7 +2551,7 @@ def create_mp3(
         def render_clip(index):
             cue = cues[index]
             cue['effective_tag'] = effective_voice_tag(cue.get('tag', 'M_ADULT'), voice_mode)
-            profile = VOICE_PROFILES.get(cue['effective_tag'], VOICE_PROFILES['M_ADULT'])
+            profile = LOCKED_VOICE_PROFILES[cue['effective_tag']]
             raw_clip = root / f'raw_clip_{index:04d}.mp3'
             try:
                 run_async(synthesize(cue['text'], profile, raw_clip))
@@ -4143,7 +4159,7 @@ with tab_text_speech:
             try:
                 with tempfile.TemporaryDirectory() as folder:
                     output = Path(folder) / "speech.mp3"
-                    voice_profile = VOICE_PROFILES[{"M": "M_ADULT", "F": "F_ADULT"}[voice_choice]]
+                    voice_profile = LOCKED_VOICE_PROFILES[voice_choice]
                     run_async(synthesize(plain_text.strip(), voice_profile, output))
                     st.session_state.text_tab_audio_bytes = output.read_bytes()
                 st.success("✅ បង្កើតសំឡេងរួចរាល់។")
