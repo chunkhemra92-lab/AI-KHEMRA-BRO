@@ -2373,7 +2373,7 @@ def effective_voice_tag(tag, voice_mode):
 
 def create_mp3(
     srt_text, progress_callback=None, audio_sync_mode="Speed Up Only", voice_mode="Auto",
-    target_language=DEFAULT_TARGET_LANGUAGE,
+    target_language=DEFAULT_TARGET_LANGUAGE, music_path=None, ambience_path=None,
 ):
     """
     Create one synchronized Khmer MP3.
@@ -2436,9 +2436,19 @@ def create_mp3(
         command = ['ffmpeg', '-y']
         for clip in clips:
             command.extend(['-i', str(clip)])
-
+        music_index = None
+        ambience_index = None
+        if music_path:
+            music_index = len(clips)
+            command.extend(['-stream_loop', '-1', '-i', str(music_path)])
+        if ambience_path:
+            ambience_index = len(clips) + (1 if music_path else 0)
+            command.extend(['-stream_loop', '-1', '-i', str(ambience_path)])
         filters = []
+        direct_labels = []
+        thought_labels = []
         labels = []
+
         final_end_ms = 0
 
         for index, cue in enumerate(cues):
@@ -2479,22 +2489,33 @@ def create_mp3(
             if tempo:
                 parts.append(tempo)
 
-            # Warm, controlled speech chain:
-            # - reduce rumble and strong airy hiss
-            # - keep Khmer consonants understandable
-            # - use gentle compression only
+            effective_tag = cue.get('effective_tag', cue.get('tag', 'M_ADULT'))
+            is_thought = effective_tag in {'M_THINK', 'F_THINK'}
+            if is_thought:
+                # Track 2: wide, airy, reverberant inner monologue.
+                parts.extend([
+                    'highpass=f=180:p=2',
+                    'lowpass=f=14500:p=2',
+                    'treble=g=4:f=10000',
+                    'pan=stereo|c0=c0|c1=c0',
+                    'extrastereo=m=2.2',
+                    'aecho=0.65:0.35:45|300|650|1100|1800|2600|3200:0.32|0.24|0.18|0.13|0.09|0.06|0.04',
+                    'volume=-7dB',
+                ])
+            else:
+                # Track 1: dry, centered dialogue with a strict anti-boxiness cut.
+                parts.extend([
+                    'highpass=f=100:p=2',
+                    'lowpass=f=14500:p=2',
+                    'equalizer=f=400:t=q:w=1.0:g=-5',
+                    'equalizer=f=3000:t=q:w=1.0:g=1.5',
+                    'treble=g=2:f=11000',
+                    'pan=mono|c0=c0',
+                    'volume=-4dB',
+                ])
             parts.extend([
-                'highpass=f=75:p=2',
-                'lowpass=f=7600:p=2',
-                'equalizer=f=180:t=q:w=1.0:g=1.2',
-                'equalizer=f=320:t=q:w=1.1:g=1.0',
-                'equalizer=f=1100:t=q:w=1.2:g=0.7',
-                'equalizer=f=2400:t=q:w=1.1:g=0.8',
-                'equalizer=f=4300:t=q:w=1.0:g=-1.8',
-                'equalizer=f=5800:t=q:w=0.9:g=-3.2',
-                'equalizer=f=7000:t=q:w=0.8:g=-3.8',
-                *character_voice_filters(cue.get('effective_tag', cue.get('tag', 'M_ADULT'))),
-                'acompressor=threshold=-23dB:ratio=2.0:attack=14:release=190:makeup=1.15:knee=4',
+                *character_voice_filters(effective_tag),
+                'acompressor=threshold=-23dB:ratio=2.0:attack=14:release=190:makeup=1.0:knee=4',
                 f'atrim=0:{trim_seconds:.3f}',
                 'asetpts=PTS-STARTPTS',
                 f'afade=t=in:st=0:d={fade_in:.3f}',
@@ -2505,6 +2526,7 @@ def create_mp3(
 
             filters.append(','.join(parts).replace('],', ']'))
             labels.append(f'[{label}]')
+            (thought_labels if is_thought else direct_labels).append(f'[{label}]')
             final_end_ms = max(
                 final_end_ms,
                 start_ms + int(trim_seconds * 1000),
@@ -2513,12 +2535,34 @@ def create_mp3(
 
         total = (final_end_ms + 350) / 1000.0
 
-        # Master once after mixing. This avoids pumping and exaggerated breath
-        # noise caused by loud-normalizing every small clip independently.
+        # Track 1 + Track 2 voice bus. Direct cues are centered and dry;
+        # thought cues remain wide and reverberant inside this stereo bus.
         filters.append(
             ''.join(labels)
-            + f'amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0,'
-              'acompressor=threshold=-18dB:ratio=1.55:attack=18:release=240:makeup=1.0:knee=5,'
+            + f'amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0,asplit=2[voice_for_sc][voice_for_mix]'
+        )
+        mix_inputs = ['[voice_for_mix]']
+        if music_index is not None:
+            filters.append(
+                f'[{music_index}:a]aresample=48000,highpass=f=80,lowpass=f=16000,'
+                f'equalizer=f=1800:t=q:w=1.0:g=-4,volume=-24dB,'
+                f'atrim=0:{total:.3f},asetpts=PTS-STARTPTS[music_src]'
+            )
+            filters.append(
+                '[music_src][voice_for_sc]sidechaincompress=threshold=0.025:ratio=8:attack=12:release=300:makeup=1:link=average[music_ducked]'
+            )
+            mix_inputs.append('[music_ducked]')
+        if ambience_index is not None:
+            filters.append(
+                f'[{ambience_index}:a]aresample=48000,highpass=f=120,lowpass=f=7000,'
+                f'volume=-23dB,atrim=0:{total:.3f},asetpts=PTS-STARTPTS[ambience_src]'
+            )
+            mix_inputs.append('[ambience_src]')
+        # Final master: preserve track separation, then apply only gentle protection.
+        filters.append(
+            ''.join(mix_inputs)
+            + f'amix=inputs={len(mix_inputs)}:duration=longest:dropout_transition=0:normalize=0,'
+              'acompressor=threshold=-18dB:ratio=1.35:attack=18:release=240:makeup=1.0:knee=5,'
               'alimiter=limit=0.94:attack=8:release=150,'
               'loudnorm=I=-16:TP=-1.5:LRA=7,'
               f'apad=whole_dur={total:.3f},atrim=0:{total:.3f}[out]'
@@ -3611,8 +3655,20 @@ st.markdown(
 tab_video, tab_translate, tab_srt_speech, tab_text_speech = st.tabs(
     ["🎬 Video → SRT", "📝 AI Subtitle Translator", "📜 SRT → Speech", "🎙️ Text → Speech"]
 )
-
+st.markdown("### 🎚️ 4-Track Audio Mix")
+st.caption("Track 1/2 = dialogue and inner thought. Track 3/4 are optional music and nature ambience layers.")
+music_upload = st.file_uploader(
+    "Track 3 — Daydream Music (optional)",
+    type=["mp3", "wav", "m4a", "ogg"],
+    key="daydream_music_upload",
+)
+ambience_upload = st.file_uploader(
+    "Track 4 — Nature & Bird Ambience (optional)",
+    type=["mp3", "wav", "m4a", "ogg"],
+    key="nature_ambience_upload",
+)
 with tab_video:
+
     st.markdown('<div class="section-title">1️⃣ Generate Subtitles (Khmer ខ្មែរ)</div>', unsafe_allow_html=True)
 
     uploaded_video = st.file_uploader(
@@ -3830,6 +3886,8 @@ with tab_video:
                         unsafe_allow_html=True,
                     )
 
+                music_path = save_upload(music_upload) if music_upload else None
+                ambience_path = save_upload(ambience_upload) if ambience_upload else None
                 try:
                     update_audio_progress(1, "កំពុងចាប់ផ្ដើមបង្កើតសំឡេង…")
                     st.session_state.audio_bytes = create_mp3(
@@ -3838,6 +3896,8 @@ with tab_video:
                         audio_sync_mode=audio_sync_mode,
                         voice_mode=voice_mode,
                         target_language=target_language,
+                        music_path=music_path,
+                        ambience_path=ambience_path,
                     )
                     # Clear the processing display immediately after completion.
                     progress_bar.empty()
@@ -3850,6 +3910,11 @@ with tab_video:
                     progress_bar.empty()
                     progress_text.empty()
                     st.error(f"❌ បង្កើត MP3 មិនបាន៖ {exc}")
+                finally:
+                    if music_path is not None:
+                        music_path.unlink(missing_ok=True)
+                    if ambience_path is not None:
+                        ambience_path.unlink(missing_ok=True)
     else:
         if not st.session_state.get("mp3_filename_widget"):
             st.session_state.mp3_filename_widget = st.session_state.get(
@@ -3963,6 +4028,8 @@ with tab_srt_speech:
         if not speech_srt.strip():
             st.warning("សូមបញ្ចូល Khmer SRT។")
         else:
+            music_path = save_upload(music_upload) if music_upload else None
+            ambience_path = save_upload(ambience_upload) if ambience_upload else None
             try:
                 with st.spinner("កំពុងបង្កើតសំឡេង…"):
                     st.session_state.speech_tab_audio_bytes = create_mp3(
@@ -3970,10 +4037,17 @@ with tab_srt_speech:
                         audio_sync_mode=audio_sync_mode,
                         voice_mode=voice_mode,
                         target_language=target_language,
+                        music_path=music_path,
+                        ambience_path=ambience_path,
                     )
                 st.success("✅ បង្កើត MP3 រួចរាល់។")
             except Exception as exc:
                 st.error(f"❌ {exc}")
+            finally:
+                if music_path is not None:
+                    music_path.unlink(missing_ok=True)
+                if ambience_path is not None:
+                    ambience_path.unlink(missing_ok=True)
     if st.session_state.get("speech_tab_audio_bytes"):
         st.audio(st.session_state.speech_tab_audio_bytes, format="audio/mp3")
         st.download_button(
