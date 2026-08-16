@@ -4072,7 +4072,7 @@ with tab_text_speech:
     plain_text = st.text_area("Khmer Text", height=260, key="plain_text_input")
     voice_choice = st.selectbox(
         "Voice",
-        ["BOY", "GIRL"],
+        ["M", "F"],
         key="plain_voice",
     )
     if st.button("🔊 Generate Voice", key="plain_voice_btn"):
@@ -4082,7 +4082,8 @@ with tab_text_speech:
             try:
                 with tempfile.TemporaryDirectory() as folder:
                     output = Path(folder) / "speech.mp3"
-                    run_async(synthesize(plain_text.strip(), VOICE_PROFILES[voice_choice], output))
+                    voice_profile = VOICE_PROFILES[{"M": "M_ADULT", "F": "F_ADULT"}[voice_choice]]
+                    run_async(synthesize(plain_text.strip(), voice_profile, output))
                     st.session_state.text_tab_audio_bytes = output.read_bytes()
                 st.success("✅ បង្កើតសំឡេងរួចរាល់។")
             except Exception as exc:
