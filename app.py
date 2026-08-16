@@ -543,6 +543,11 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer{position:fixed!important;top:68px!important;left:12px!important;z-index:1000000!important;width:min(380px,calc(100vw - 38px))!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;box-sizing:border-box!important;margin:0!important;padding:20px 18px 34px!important;overflow-y:auto!important;overscroll-behavior:contain!important;background:#0c1424!important;border:1px solid #23d7f2!important;border-radius:22px!important;box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;color:#f8fafc!important;scrollbar-width:thin;scrollbar-color:#38d9f5 #0c1424}
 .st-key-settings_drawer > div,.st-key-settings_drawer [data-testid="stVerticalBlock"],.st-key-settings_drawer [data-testid="stVerticalBlock"] > div{width:100%!important;min-width:0!important;background:transparent!important}
 .st-key-settings_drawer [data-testid="stMarkdownContainer"] p,.st-key-settings_drawer label,.st-key-settings_drawer label p,.st-key-settings_drawer [data-testid="stCaptionContainer"]{color:#f8fafc!important}
+.st-key-api_key_input_box textarea{
+  -webkit-text-security:disc!important;
+  text-security:disc!important;
+  letter-spacing:2px!important;
+}
 .st-key-settings_drawer [data-baseweb="select"] > div,.st-key-settings_drawer input,.st-key-settings_drawer textarea{background:#202b3d!important;color:#ffffff!important;border-color:#dbe7f4!important}
 .st-key-settings_drawer textarea::placeholder,.st-key-settings_drawer input::placeholder{color:#abb9cc!important}
 .st-key-api_key_input_box{display:block!important;width:100%!important;margin:7px 0 12px!important}
@@ -3623,7 +3628,7 @@ if st.session_state.settings_drawer_open:
         )
         st.divider()
         st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
-        st.caption("Paste Gemini API Keys (One per line)")
+        st.caption("🔒 បញ្ចូល Gemini API Key មួយក្នុងមួយបន្ទាត់។ Key នឹងត្រូវបានលាក់ ដើម្បីការពារសុវត្ថិភាព។")
         with st.container(key="api_key_input_box"):
             st.text_area(
                 "Gemini API Keys", height=118, key="api_keys_manager", label_visibility="collapsed",
