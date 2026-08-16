@@ -112,11 +112,19 @@ button[data-baseweb="tab"]{
   padding:11px 13px!important;
   min-height:46px!important;
   color:#aeb8c7!important;
+  font-size:14px!important;
   font-weight:800!important;
   justify-content:center!important;
   white-space:normal!important;
   text-align:center!important;
   line-height:1.2!important;
+}
+button[data-baseweb="tab"] p,
+button[data-baseweb="tab"] span{
+  margin:0!important;
+  font-size:14px!important;
+  line-height:1.2!important;
+  font-weight:800!important;
 }
 button[data-baseweb="tab"][aria-selected="true"]{
   background:linear-gradient(90deg,#0284c7,#22d3ee)!important;
@@ -191,6 +199,12 @@ div[data-baseweb="popover"] .st-key-api_keys_manager textarea{
     padding:10px 5px!important;
     min-height:50px!important;
     font-size:12px!important;
+  }
+  button[data-baseweb="tab"] p,
+  button[data-baseweb="tab"] span{
+    font-size:12px!important;
+    line-height:1.2!important;
+    font-weight:800!important;
   }
   button[data-baseweb="tab"] p{
     white-space:normal!important;
