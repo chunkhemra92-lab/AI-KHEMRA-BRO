@@ -907,6 +907,8 @@ TARGET_LANGUAGE_OPTIONS = {
     "🇻🇳 Tiếng Việt": {"code": "vi", "name": "Vietnamese"},
     "🇹🇭 ภาษาไทย": {"code": "th", "name": "Thai"},
     "🇯🇵 日本語": {"code": "ja", "name": "Japanese"},
+    "🇮🇩 Bahasa Indonesia": {"code": "id", "name": "Indonesian"},
+    "🇰🇷 한국어 (Korean)": {"code": "ko", "name": "Korean"},
 }
 DEFAULT_TARGET_LANGUAGE = "🇰🇭 Khmer (ខ្មែរ)"
 SRT_INPUT_HEIGHT = 300
@@ -2198,11 +2200,11 @@ def translate_cues_text_only(
     return translated
 
 
-def google_translate_texts(texts, google_api_key):
+def google_translate_texts(texts, google_api_key, target_code="km"):
     """Translate a batch through the customer's Google Cloud Translation key."""
     if not google_api_key:
         raise ValueError("សូមបញ្ចូល Google Cloud Translation API Key ក្នុង Settings។")
-    payload = json.dumps({"q": texts, "target": "km", "format": "text"}).encode("utf-8")
+    payload = json.dumps({"q": texts, "target": target_code, "format": "text"}).encode("utf-8")
     endpoint = "https://translation.googleapis.com/language/translate/v2?key=" + urlparse.quote(google_api_key, safe="")
     request = urlrequest.Request(
         endpoint,
@@ -2232,7 +2234,8 @@ def translate_cues_with_google(
     for offset in range(0, len(cues), 40):
         batch = cues[offset:offset + 40]
         sources = [str(cue.get("source", cue.get("text", ""))).strip() for cue in batch]
-        outputs = google_translate_texts(sources, google_api_key)
+        target_code = target_language_details(target_language)["code"]
+        outputs = google_translate_texts(sources, google_api_key, target_code)
         for cue, text in zip(batch, outputs):
             if not text:
                 raise RuntimeError(f"Google មិនបានបកប្រែបន្ទាត់ {cue['id']}")
