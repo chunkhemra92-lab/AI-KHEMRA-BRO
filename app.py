@@ -578,6 +578,9 @@ body{overflow-x:hidden!important}
 [data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer) .st-key-settings_drawer{pointer-events:auto!important}
 .st-key-settings_drawer_toggle button{
   pointer-events:auto!important;width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
+.st-key-settings_drawer_toggle:has(.settings-toggle-state-open) button{visibility:hidden!important;pointer-events:none!important}
+.st-key-settings_drawer:has(.settings-drawer-state-closed){visibility:hidden!important;pointer-events:none!important}
+.st-key-settings_drawer:has(.settings-drawer-state-closed) *{pointer-events:none!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
 .st-key-settings_drawer{pointer-events:auto!important;position:fixed!important;top:68px!important;left:12px!important;z-index:1000000!important;width:min(380px,calc(100vw - 38px))!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;box-sizing:border-box!important;margin:0!important;padding:20px 18px 34px!important;overflow-y:auto!important;overscroll-behavior:contain!important;background:#0c1424!important;border:1px solid #23d7f2!important;border-radius:22px!important;box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;color:#f8fafc!important;scrollbar-width:thin;scrollbar-color:#38d9f5 #0c1424;contain:layout paint style;isolation:isolate;animation:none!important;transition:none!important;transform:none!important;will-change:auto!important}
 .st-key-settings_drawer_toggle,.st-key-settings_drawer_toggle *{animation:none!important;transition:none!important;transform:none!important}
@@ -3737,97 +3740,103 @@ def _close_settings_drawer():
 
 
 with st.container(key="settings_drawer_toggle"):
-    if not st.session_state.settings_drawer_open:
-        st.button(
-            "⚙️", key="open_settings_drawer", help="Open Settings",
-            on_click=_open_settings_drawer,
+    if st.session_state.settings_drawer_open:
+        st.markdown('<span class="settings-toggle-state-open" aria-hidden="true"></span>', unsafe_allow_html=True)
+    else:
+        st.markdown('<span class="settings-toggle-state-closed" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.button(
+        "⚙️", key="open_settings_drawer", help="Open Settings",
+        on_click=_open_settings_drawer,
+    )
+with st.container(key="settings_drawer"):
+    if st.session_state.settings_drawer_open:
+        st.markdown('<span class="settings-drawer-state-open" aria-hidden="true"></span>', unsafe_allow_html=True)
+    else:
+        st.markdown('<span class="settings-drawer-state-closed" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.button(
+        "✕ បិទ Settings", key="close_settings_drawer", use_container_width=True,
+        on_click=_close_settings_drawer,
+    )
+    # Reference-style account card using only this authenticated Access Code's data.
+    private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
+    private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
+    private_now = _utcnow()
+    private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
+    private_customer_name = str(dict(login_row).get("customer_name") or st.session_state.get("customer_name") or "Customer")
+    private_seconds_left = max(0, (private_expiry - private_now).total_seconds())
+    private_days_left = int((private_seconds_left + 86399) // 86400)
+    st.markdown(
+        f"""<div class="settings-profile-card">
+            <p class="settings-profile-name">👋 {html.escape(private_customer_name)}</p>
+            <p class="settings-profile-detail">🎫 PLAN: {html.escape(private_plan)}</p>
+            <p class="settings-profile-detail">📅 EXPIRY: {private_expiry.strftime("%Y-%m-%d")}</p>
+            <p class="settings-profile-days">⌛ {private_days_left} DAYS LEFT</p>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+    if not private_active:
+        st.error("❌ កញ្ចប់បានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិ។")
+    if st.button("🚪 ចាកចេញ (Logout)", key="customer_logout", use_container_width=True):
+        release_customer_session(st.session_state.get("customer_code", ""), current_token)
+        _session_cookie_delete()
+        clear_private_user_session()
+        for key in (
+            "customer_authenticated", "customer_name", "customer_code",
+            "customer_session_token", "settings_owner_code",
+        ):
+            st.session_state.pop(key, None)
+        st.rerun()
+    st.divider()
+    st.markdown('<h3 class="settings-drawer-section">🌍 Translation Language</h3>', unsafe_allow_html=True)
+    st.selectbox(
+        "Target Language", list(TARGET_LANGUAGE_OPTIONS), key="target_language",
+        on_change=account_settings_changed,
+    )
+    st.divider()
+    st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
+    st.caption("🔒 បញ្ចូល Gemini API Key មួយក្នុងមួយបន្ទាត់។ Key នឹងត្រូវបានលាក់ ដើម្បីការពារសុវត្ថិភាព។")
+    with st.container(key="api_key_input_box"):
+        st.text_area(
+            "Gemini API Keys", height=118, key="api_keys_manager", label_visibility="collapsed",
+            placeholder="AIza...", on_change=save_api_keys_from_manager,
         )
-if st.session_state.settings_drawer_open:
-    with st.container(key="settings_drawer"):
-        st.button(
-            "✕ បិទ Settings", key="close_settings_drawer", use_container_width=True,
-            on_click=_close_settings_drawer,
-        )
-        # Reference-style account card using only this authenticated Access Code's data.
-        private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
-        private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
-        private_now = _utcnow()
-        private_active = bool(login_row["is_active"]) and private_now < _parse_iso(login_row["expires_at"])
-        private_customer_name = str(dict(login_row).get("customer_name") or st.session_state.get("customer_name") or "Customer")
-        private_seconds_left = max(0, (private_expiry - private_now).total_seconds())
-        private_days_left = int((private_seconds_left + 86399) // 86400)
-        st.markdown(
-            f"""<div class="settings-profile-card">
-                <p class="settings-profile-name">👋 {html.escape(private_customer_name)}</p>
-                <p class="settings-profile-detail">🎫 PLAN: {html.escape(private_plan)}</p>
-                <p class="settings-profile-detail">📅 EXPIRY: {private_expiry.strftime("%Y-%m-%d")}</p>
-                <p class="settings-profile-days">⌛ {private_days_left} DAYS LEFT</p>
-            </div>""",
-            unsafe_allow_html=True,
-        )
-        if not private_active:
-            st.error("❌ កញ្ចប់បានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិ។")
-        if st.button("🚪 ចាកចេញ (Logout)", key="customer_logout", use_container_width=True):
-            release_customer_session(st.session_state.get("customer_code", ""), current_token)
-            _session_cookie_delete()
-            clear_private_user_session()
-            for key in (
-                "customer_authenticated", "customer_name", "customer_code",
-                "customer_session_token", "settings_owner_code",
-            ):
-                st.session_state.pop(key, None)
-            st.rerun()
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🌍 Translation Language</h3>', unsafe_allow_html=True)
-        st.selectbox(
-            "Target Language", list(TARGET_LANGUAGE_OPTIONS), key="target_language",
-            on_change=account_settings_changed,
-        )
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🔑 API Keys Manager</h3>', unsafe_allow_html=True)
-        st.caption("🔒 បញ្ចូល Gemini API Key មួយក្នុងមួយបន្ទាត់។ Key នឹងត្រូវបានលាក់ ដើម្បីការពារសុវត្ថិភាព។")
-        with st.container(key="api_key_input_box"):
-            st.text_area(
-                "Gemini API Keys", height=118, key="api_keys_manager", label_visibility="collapsed",
-                placeholder="AIza...", on_change=save_api_keys_from_manager,
-            )
-        simple_key_count = len(_normalized_api_keys(st.session_state.get("api_keys_manager", "")))
-        if simple_key_count:
-            st.success(f"✅ មាន {simple_key_count} Keys")
-        else:
-            st.warning("⚠️ សូមបញ្ចូល API Key ដើម្បីប្រើការបកប្រែ។")
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
+    simple_key_count = len(_normalized_api_keys(st.session_state.get("api_keys_manager", "")))
+    if simple_key_count:
+        st.success(f"✅ មាន {simple_key_count} Keys")
+    else:
+        st.warning("⚠️ សូមបញ្ចូល API Key ដើម្បីប្រើការបកប្រែ។")
+    st.divider()
+    st.markdown('<h3 class="settings-drawer-section">⚙️ Audio Sync Mode</h3>', unsafe_allow_html=True)
 
+    st.radio(
+        "កំណត់ល្បឿនសំឡេង៖", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
+        format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
+        on_change=account_settings_changed,
+        help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
+    )
+
+    st.divider()
+    st.markdown('<h3 class="settings-drawer-section">🗣️ Voice Mode (ជ្រើសសំឡេង)</h3>', unsafe_allow_html=True)
+    st.radio(
+        "កំណត់សំឡេង Tab 1 & Tab 2:", VOICE_MODE_OPTIONS, key="voice_mode",
+        format_func=lambda value: {"Auto": "Auto (ប្រុស/ស្រី តាម Tag)", "All Male": "All Male (ប្រុសទាំងអស់)", "All Female": "All Female (ស្រីទាំងអស់)"}[value],
+        on_change=account_settings_changed,
+        help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
+    )
+
+    st.divider()
+    st.markdown('<h3 class="settings-drawer-section">🧠 AI Model (ជ្រើស AI)</h3>', unsafe_allow_html=True)
+    if st.session_state.translation_provider == "Gemini":
         st.radio(
-            "កំណត់ល្បឿនសំឡេង៖", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
-            format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
+            "ជ្រើសរើសម៉ូដែល (Select Model):",
+            GEMINI_TRANSLATION_MODEL_OPTIONS,
+            key="model_selector",
+            format_func=lambda value: value,
             on_change=account_settings_changed,
-            help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
+            help="ម៉ូដែលដែលបានជ្រើសត្រូវបានផ្ញើទៅ Gemini API ជាមុន។ បើ API Key មិនគាំទ្រម៉ូដែលនោះ កម្មវិធីសាកម៉ូដែល Stable ផ្សេងដោយសុវត្ថិភាព។",
         )
-
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🗣️ Voice Mode (ជ្រើសសំឡេង)</h3>', unsafe_allow_html=True)
-        st.radio(
-            "កំណត់សំឡេង Tab 1 & Tab 2:", VOICE_MODE_OPTIONS, key="voice_mode",
-            format_func=lambda value: {"Auto": "Auto (ប្រុស/ស្រី តាម Tag)", "All Male": "All Male (ប្រុសទាំងអស់)", "All Female": "All Female (ស្រីទាំងអស់)"}[value],
-            on_change=account_settings_changed,
-            help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
-        )
-
-        st.divider()
-        st.markdown('<h3 class="settings-drawer-section">🧠 AI Model (ជ្រើស AI)</h3>', unsafe_allow_html=True)
-        if st.session_state.translation_provider == "Gemini":
-            st.radio(
-                "ជ្រើសរើសម៉ូដែល (Select Model):",
-                GEMINI_TRANSLATION_MODEL_OPTIONS,
-                key="model_selector",
-                format_func=lambda value: value,
-                on_change=account_settings_changed,
-                help="ម៉ូដែលដែលបានជ្រើសត្រូវបានផ្ញើទៅ Gemini API ជាមុន។ បើ API Key មិនគាំទ្រម៉ូដែលនោះ កម្មវិធីសាកម៉ូដែល Stable ផ្សេងដោយសុវត្ថិភាព។",
-            )
-        else:
-            st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
+    else:
+        st.info("🌐 Google Cloud Translation កំពុងត្រូវបានជ្រើស។ វាមិនប្រើ Gemini Model ទេ។ ជ្រើស Gemini API ខាងលើ ប្រសិនបើអ្នកចង់កំណត់ AI Studio Model។")
 
 api_keys_text = st.session_state.get(
     "saved_api_keys_text", st.session_state.get("api_keys_manager", "")
