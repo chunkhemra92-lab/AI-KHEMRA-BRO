@@ -8,7 +8,8 @@ assert "def _close_settings_drawer():" in SOURCE
 assert 'on_click=_open_settings_drawer' in SOURCE
 assert 'on_click=_close_settings_drawer' in SOURCE
 assert '.st-key-settings_drawer_toggle{position:fixed!important' in SOURCE
-assert '[data-testid="stElementContainer"]:has(.st-key-settings_drawer){height:0!important' in SOURCE
+assert '[data-testid="stElementContainer"]:has(.st-key-settings_drawer)' in SOURCE
+assert 'pointer-events:auto!important;position:fixed!important' in SOURCE
 assert '@keyframes settings-drawer-door' in SOURCE
 
 block = SOURCE[SOURCE.index('with st.container(key="settings_drawer_toggle")'):SOURCE.index('        # Reference-style account card', SOURCE.index('with st.container(key="settings_drawer_toggle")'))]
