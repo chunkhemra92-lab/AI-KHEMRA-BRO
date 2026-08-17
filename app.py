@@ -3696,16 +3696,27 @@ st.session_state.translation_style = DEFAULT_TRANSLATION_STYLE
 if "settings_drawer_open" not in st.session_state:
     st.session_state.settings_drawer_open = False
 
+
+def _open_settings_drawer():
+    st.session_state.settings_drawer_open = True
+
+
+def _close_settings_drawer():
+    st.session_state.settings_drawer_open = False
+
+
 with st.container(key="settings_drawer_toggle"):
     if not st.session_state.settings_drawer_open:
-        if st.button("⚙️", key="open_settings_drawer", help="Open Settings"):
-            st.session_state.settings_drawer_open = True
-            st.rerun()
+        st.button(
+            "⚙️", key="open_settings_drawer", help="Open Settings",
+            on_click=_open_settings_drawer,
+        )
 if st.session_state.settings_drawer_open:
     with st.container(key="settings_drawer"):
-        if st.button("✕ បិទ Settings", key="close_settings_drawer", use_container_width=True):
-            st.session_state.settings_drawer_open = False
-            st.rerun()
+        st.button(
+            "✕ បិទ Settings", key="close_settings_drawer", use_container_width=True,
+            on_click=_close_settings_drawer,
+        )
         # Reference-style account card using only this authenticated Access Code's data.
         private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
         private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
