@@ -491,6 +491,14 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   line-height:1.65;
 }
 .login-help strong{color:#20d7f6}
+.login-brand-orb{width:104px;height:104px;margin:0 auto 18px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;border:2px solid #31dcff;background:radial-gradient(circle at 50% 28%,#263d68 0%,#10152a 45%,#070a15 100%);box-shadow:0 0 0 5px rgba(25,148,255,.12),0 0 24px rgba(23,183,255,.66),inset 0 0 24px rgba(225,19,255,.22)}
+.login-brand-orb:after{content:"";position:absolute;inset:8px;border:1px solid rgba(216,28,255,.72);border-radius:50%;pointer-events:none}
+.login-brand-orb-core{color:#d8f9ff;font-size:29px;font-weight:950;letter-spacing:-2px;line-height:1;text-shadow:0 0 9px #22d3ee}.login-brand-orb-name{margin-top:7px;color:#b3f4ff;font-size:9px;font-weight:950;letter-spacing:.4px;z-index:1}.login-brand-orb-name b{color:#f05bff}
+.login-section-heading{display:flex;align-items:center;gap:18px;justify-content:center;margin:0 0 14px}.login-section-heading>span{width:72px;height:2px;background:linear-gradient(90deg,transparent,#25d9ff)}.login-section-heading>span:last-child{background:linear-gradient(90deg,#25d9ff,transparent)}
+.login-section-heading .login-form-title{margin:0!important;background:linear-gradient(180deg,#ff79ff,#b51cf0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 18px rgba(224,26,255,.3)}
+.login-help-row{text-align:center}.login-security-note{margin:12px 0 0;color:#8d9bb4;font-size:14px;font-weight:700}.login-security-note span{color:#b8c4d7;font-size:19px}.login-orb-footer{width:48px;height:48px;margin:22px auto 0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#c8f8ff;font-size:11px;font-weight:950;border:1px solid rgba(42,219,255,.8);background:radial-gradient(circle,#263f72,#090e1c 68%);box-shadow:0 0 16px rgba(26,185,255,.5)}
+.st-key-customer_login_box [data-testid="stFormSubmitButton"] button{width:100%!important;min-height:58px!important;border:0!important;border-radius:14px!important;background:linear-gradient(110deg,#d815e8 0%,#6e2bff 55%,#1d5cff 100%)!important;box-shadow:0 12px 28px rgba(112,39,255,.32)!important;font-size:19px!important;font-weight:950!important;letter-spacing:.1px!important}.st-key-customer_login_box [data-testid="stFormSubmitButton"] button:hover{filter:brightness(1.1)!important;transform:translateY(-1px)}
+@media(max-width:700px){.login-brand-orb{width:88px;height:88px;margin-bottom:14px}.login-brand-orb-core{font-size:25px}.login-brand-orb-name{font-size:8px}.login-section-heading{gap:10px}.login-section-heading>span{width:42px}.login-security-note{font-size:12px}.login-orb-footer{margin-top:18px}}
 @media(max-width:700px){
   .st-key-public_login_wrap{width:100%!important;padding:0 6px 34px!important}
   .login-hero-card{margin:12px 0 28px;padding:46px 20px 26px;border-radius:30px}
@@ -3400,6 +3408,10 @@ def public_login_screen():
         st.markdown(
             """
             <section class="login-hero-card">
+              <div class="login-brand-orb" aria-label="AI KHEMRA BRO brand mark">
+                <span class="login-brand-orb-core">AI</span>
+                <span class="login-brand-orb-name">KHEMRA <b>BRO</b></span>
+              </div>
               <h1>AI KHEMRA BRO</h1>
               <p class="login-tagline">GLOBAL AI DUBBING WORKSTATION</p>
               <p class="login-khmer">ដំណោះស្រាយបកប្រែ និងសំឡេងខ្មែរសម្រាប់អ្នក</p>
@@ -3419,7 +3431,7 @@ def public_login_screen():
             """,
             unsafe_allow_html=True,
         )
-        st.markdown('<h2 class="login-form-title">Login</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="login-section-heading"><span></span><h2 class="login-form-title">LOGIN</h2><span></span></div>', unsafe_allow_html=True)
 
         with st.container(key="customer_login_box"):
             with st.form("customer_login_form", clear_on_submit=False):
@@ -3455,10 +3467,11 @@ def public_login_screen():
 
         st.markdown(
             """
-            <div class="login-help">
-              សូមទាក់ទង Owner ដើម្បីទទួល <strong>Access Code</strong>
-              សម្រាប់ចូលប្រើកម្មវិធី។
+            <div class="login-help-row">
+              <div class="login-help">សូមទាក់ទង Owner ដើម្បីទទួល <strong>Access Code</strong> សម្រាប់ចូលប្រើកម្មវិធី។</div>
+              <div class="login-security-note"><span>◈</span> ការពារសុវត្ថិភាព&nbsp;&nbsp;|&nbsp;&nbsp;ទិន្នន័យការពារ</div>
             </div>
+            <div class="login-orb-footer" aria-hidden="true">AI</div>
             """,
             unsafe_allow_html=True,
         )
