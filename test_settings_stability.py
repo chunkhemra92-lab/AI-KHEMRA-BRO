@@ -3,9 +3,10 @@ import re
 
 SOURCE = Path(__file__).with_name("app.py").read_text(encoding="utf-8")
 
+assert "def _toggle_settings_drawer():" in SOURCE
 assert "def _open_settings_drawer():" in SOURCE
 assert "def _close_settings_drawer():" in SOURCE
-assert 'on_click=_open_settings_drawer' in SOURCE
+assert 'on_click=_toggle_settings_drawer' in SOURCE
 assert 'on_click=_close_settings_drawer' in SOURCE
 assert '.st-key-settings_drawer_toggle{position:fixed!important' in SOURCE
 assert '[data-testid="stElementContainer"]:has(.st-key-settings_drawer)' in SOURCE
@@ -19,6 +20,7 @@ assert '[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer),' not in SO
 assert '[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer),' not in SOURCE
 assert '[data-testid="stColumn"]:has(.st-key-settings_drawer){' not in SOURCE
 assert 'animation:none!important;transition:none!important;transform:none!important;will-change:auto!important' in SOURCE
+assert '.st-key-settings_drawer_toggle:has(.settings-toggle-state-open) button' not in SOURCE
 assert 'animation:settings-drawer-door' not in SOURCE
 assert '@keyframes settings-drawer-door' not in SOURCE
 

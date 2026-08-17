@@ -578,7 +578,6 @@ body{overflow-x:hidden!important}
 [data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer) .st-key-settings_drawer{pointer-events:auto!important}
 .st-key-settings_drawer_toggle button{
   pointer-events:auto!important;width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
-.st-key-settings_drawer_toggle:has(.settings-toggle-state-open) button{visibility:hidden!important;pointer-events:none!important}
 .st-key-settings_drawer:has(.settings-drawer-state-closed){visibility:hidden!important;pointer-events:none!important}
 .st-key-settings_drawer:has(.settings-drawer-state-closed) *{pointer-events:none!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
@@ -3731,6 +3730,11 @@ if "settings_drawer_open" not in st.session_state:
     st.session_state.settings_drawer_open = False
 
 
+def _toggle_settings_drawer():
+    """Open or close Settings from the same fixed control."""
+    st.session_state.settings_drawer_open = not st.session_state.settings_drawer_open
+
+
 def _open_settings_drawer():
     st.session_state.settings_drawer_open = True
 
@@ -3739,14 +3743,17 @@ def _close_settings_drawer():
     st.session_state.settings_drawer_open = False
 
 
+
 with st.container(key="settings_drawer_toggle"):
     if st.session_state.settings_drawer_open:
         st.markdown('<span class="settings-toggle-state-open" aria-hidden="true"></span>', unsafe_allow_html=True)
     else:
         st.markdown('<span class="settings-toggle-state-closed" aria-hidden="true"></span>', unsafe_allow_html=True)
     st.button(
-        "⚙️", key="open_settings_drawer", help="Open Settings",
-        on_click=_open_settings_drawer,
+        "✕" if st.session_state.settings_drawer_open else "⚙️",
+        key="open_settings_drawer",
+        help="Close Settings" if st.session_state.settings_drawer_open else "Open Settings",
+        on_click=_toggle_settings_drawer,
     )
 with st.container(key="settings_drawer"):
     if st.session_state.settings_drawer_open:
