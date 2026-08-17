@@ -765,6 +765,11 @@ def lock_voice_tag(tag):
 # Smooth-dubbing controls: gentle fades remove clicks/cuts when speaker labels change.
 VOICE_FADE_IN_SECONDS = 0.045
 VOICE_FADE_OUT_SECONDS = 0.070
+# Consistent dialogue targets prevent audible level jumps when the four roles alternate.
+VOICE_CLIP_TARGET_LUFS = -20
+VOICE_THOUGHT_RELATIVE_GAIN_DB = -1.5
+FINAL_MASTER_TARGET_LUFS = -16
+FINAL_MASTER_TRUE_PEAK_DB = -1.5
 MIN_VOICE_GAP_MS = 12
 MAX_TEMPO_SPEED = 1.65
 # Bounded service calls keep one temporary provider failure from blocking an entire project.
@@ -2493,15 +2498,16 @@ def polish_tts_output(source_path, output_path, voice_tag):
             'lowpass=f=6800:p=2',
             'equalizer=f=3400:t=q:w=1.0:g=-1.8',
             'equalizer=f=4800:t=q:w=1.1:g=-1.4',
-            'aecho=0.8:0.82:120:0.24',
+            'aecho=0.8:0.78:110:0.18',
             'pan=stereo|c0=c0|c1=c0',
-            'haas=left_delay=2:right_delay=3:side_gain=0.08',
-            'volume=-8dB',
+            'haas=left_delay=1.2:right_delay=1.8:side_gain=0.06',
             *character_voice_filters(voice_tag),
         ]
     filters.extend([
-        'acompressor=threshold=-22dB:ratio=1.5:attack=18:release=210:makeup=1.0:knee=4',
-        'alimiter=limit=0.94:attack=8:release=120',
+        'acompressor=threshold=-24dB:ratio=1.65:attack=16:release=220:makeup=1.0:knee=5',
+        f'loudnorm=I={FINAL_MASTER_TARGET_LUFS}:TP={FINAL_MASTER_TRUE_PEAK_DB}:LRA=7',
+        f'volume={VOICE_THOUGHT_RELATIVE_GAIN_DB}dB' if voice_tag in {'M_THINK', 'F_THINK'} else 'volume=0dB',
+        'alimiter=limit=0.90:attack=8:release=120',
     ])
     result = subprocess.run(
         [
@@ -2682,18 +2688,17 @@ def create_mp3(
             effective_tag = cue.get('effective_tag', cue.get('tag', 'M_ADULT'))
             is_thought = effective_tag in {'M_THINK', 'F_THINK'}
             if is_thought:
-                # Track 2: close, natural inner monologue with only a subtle binaural offset.
+                # Track 2: close, natural inner monologue with a restrained short reflection.
                 parts.extend([
-                    # Natural inner voice: close and human, with only a subtle
-                    # binaural offset; deliberately no audible echo or hall tail.
+                    # Natural inner voice: close and human, with a very short,
+                    # low-level reflection and subtle binaural width—never a hall tail.
                     'highpass=f=150:p=2',
                     'lowpass=f=9800:p=2',
                     'equalizer=f=4300:t=q:w=1.1:g=-1.2',
                     'equalizer=f=6500:t=q:w=1.0:g=-1.0',
-                    'aecho=0.8:0.82:120:0.24',
+                    'aecho=0.8:0.78:110:0.18',
                     'pan=stereo|c0=c0|c1=c0',
-                    'haas=left_delay=1.2:right_delay=1.8:side_gain=0.08',
-                    'volume=-8dB',
+                    'haas=left_delay=1.2:right_delay=1.8:side_gain=0.06',
                 ])
             else:
                 # Track 1: dry, centered dialogue with a strict anti-boxiness cut.
@@ -2705,11 +2710,12 @@ def create_mp3(
                     'equalizer=f=4500:t=q:w=1.1:g=-1.6',
                     'equalizer=f=7200:t=q:w=1.0:g=-2.6',
                     'pan=mono|c0=c0',
-                    'volume=-4dB',
                 ])
             parts.extend([
                 *character_voice_filters(effective_tag),
-                'acompressor=threshold=-23dB:ratio=2.0:attack=14:release=190:makeup=1.0:knee=4',
+                'acompressor=threshold=-24dB:ratio=1.7:attack=16:release=220:makeup=1.0:knee=5',
+                f'loudnorm=I={VOICE_CLIP_TARGET_LUFS}:TP=-3.0:LRA=7',
+                f'volume={VOICE_THOUGHT_RELATIVE_GAIN_DB}dB' if is_thought else 'volume=0dB',
                 f'atrim=0:{trim_seconds:.3f}',
                 'asetpts=PTS-STARTPTS',
                 f'afade=t=in:st=0:d={fade_in:.3f}',
@@ -2730,7 +2736,7 @@ def create_mp3(
         total = (final_end_ms + 350) / 1000.0
 
         # Track 1 + Track 2 voice bus. Direct cues are centered and dry;
-        # thought cues remain wide and reverberant inside this stereo bus.
+        # thought cues retain only a subtle close stereo reflection.
         voice_bus = (
             ''.join(labels)
             + f'amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0'
@@ -2762,9 +2768,9 @@ def create_mp3(
         filters.append(
             ''.join(mix_inputs)
             + f'amix=inputs={len(mix_inputs)}:duration=longest:dropout_transition=0:normalize=0,'
-              'acompressor=threshold=-18dB:ratio=1.35:attack=18:release=240:makeup=1.0:knee=5,'
-              'alimiter=limit=0.94:attack=8:release=150,'
-              'loudnorm=I=-23:TP=-4.0:LRA=9,'
+              'acompressor=threshold=-19dB:ratio=1.35:attack=18:release=240:makeup=1.0:knee=5,'
+              f'loudnorm=I={FINAL_MASTER_TARGET_LUFS}:TP={FINAL_MASTER_TRUE_PEAK_DB}:LRA=7,'
+              'alimiter=limit=0.90:attack=8:release=150,'
               f'apad=whole_dur={total:.3f},atrim=0:{total:.3f}[out]'
         )
 

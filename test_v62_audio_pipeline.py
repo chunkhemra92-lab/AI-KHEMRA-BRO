@@ -47,7 +47,7 @@ SREYMOM = "km-KH-SreymomNeural"
 VOICE_PROFILES = {
     "M_ADULT": {"voice": PISITH, "rate": "-1%", "pitch": "+0Hz", "volume": "+2%"},
     "F_ADULT": {"voice": SREYMOM, "rate": "-1%", "pitch": "+0Hz", "volume": "+2%"},
-    "M_THINK": {"voice": PISITH, "rate": "-4%", "pitch": "-2Hz", "volume": "+0%"},
+    "M_THINK": {"voice": PISITH, "rate": "-4%", "pitch": "-1Hz", "volume": "+0%"},
     "F_THINK": {"voice": SREYMOM, "rate": "-4%", "pitch": "-1Hz", "volume": "+0%"},
 }
 LOCKED_VOICE_PROFILES = {
@@ -77,6 +77,10 @@ namespace = {
     "ThreadPoolExecutor": ThreadPoolExecutor,
     "VOICE_FADE_IN_SECONDS": 0.045,
     "VOICE_FADE_OUT_SECONDS": 0.070,
+    "VOICE_CLIP_TARGET_LUFS": -20,
+    "VOICE_THOUGHT_RELATIVE_GAIN_DB": -1.5,
+    "FINAL_MASTER_TARGET_LUFS": -16,
+    "FINAL_MASTER_TRUE_PEAK_DB": -1.5,
     "LOCKED_VOICE_TAGS": frozenset({"M", "F", "M_THINK", "F_THINK"}),
     "LOCKED_VOICE_PROFILES": LOCKED_VOICE_PROFILES,
     "VOICE_PROFILES": VOICE_PROFILES,
