@@ -670,6 +670,27 @@ body:has(.settings-toggle-state-closed) .st-key-api_key_input_box{display:none!i
 .st-key-create_license_form label,.st-key-create_license_form label p{font-size:15px!important}
 .st-key-create_license_form input{min-height:50px!important}
 @media(max-width:700px){.admin-clean-title{margin-top:0!important;margin-bottom:14px!important}.st-key-create_license_form{padding:20px 16px 16px!important;border-radius:15px!important}.st-key-admin_logout button{min-height:38px!important;font-size:12px!important}}
+
+/* Persistent customer theme: a zero-size marker switches color only, never layout geometry. */
+.theme-mode-dark,.theme-mode-light{display:none!important}
+body:has(.theme-mode-light),body:has(.theme-mode-light) .stApp,body:has(.theme-mode-light) [data-testid="stAppViewContainer"]{background:#f3f7fb!important;color:#172033!important}
+body:has(.theme-mode-light) [data-testid="stHeader"],body:has(.theme-mode-light) [data-testid="stToolbar"]{background:rgba(243,247,251,.94)!important}
+body:has(.theme-mode-light) .block-container{color:#172033!important}
+body:has(.theme-mode-light) .hero{background:linear-gradient(135deg,#ffffff,#e5f7ff)!important;border-color:#0ea5e9!important;box-shadow:0 14px 30px rgba(14,165,233,.16)!important}
+body:has(.theme-mode-light) .hero h1,body:has(.theme-mode-light) .section-title,body:has(.theme-mode-light) h1,body:has(.theme-mode-light) h2,body:has(.theme-mode-light) h3,body:has(.theme-mode-light) label,body:has(.theme-mode-light) [data-testid="stMarkdownContainer"] p{color:#172033!important}
+body:has(.theme-mode-light) .hero p{color:#0369a1!important}
+body:has(.theme-mode-light) [data-baseweb="tab-list"]{background:#ffffff!important;border-color:#cbd5e1!important}
+body:has(.theme-mode-light) [data-baseweb="tab"]{color:#334155!important}
+body:has(.theme-mode-light) [data-baseweb="tab"][aria-selected="true"]{color:#0369a1!important}
+body:has(.theme-mode-light) [data-testid="stFileUploader"] section,body:has(.theme-mode-light) .stTextArea textarea,body:has(.theme-mode-light) .stTextInput input,body:has(.theme-mode-light) [data-baseweb="select"] > div{background:#ffffff!important;color:#172033!important;border-color:#94a3b8!important}
+body:has(.theme-mode-light) .stButton>button,body:has(.theme-mode-light) .stDownloadButton>button{background:#ffffff!important;color:#0f3f63!important;border-color:#38bdf8!important;box-shadow:0 5px 16px rgba(14,165,233,.12)!important}
+body:has(.theme-mode-light) .stButton>button:hover,body:has(.theme-mode-light) .stDownloadButton>button:hover{background:#e0f2fe!important;color:#075985!important}
+body:has(.theme-mode-light) .st-key-settings_drawer{background:#ffffff!important;border-color:#0ea5e9!important;color:#172033!important;box-shadow:16px 12px 38px rgba(15,23,42,.18)!important}
+body:has(.theme-mode-light) .st-key-settings_drawer [data-testid="stMarkdownContainer"] p,body:has(.theme-mode-light) .st-key-settings_drawer label,body:has(.theme-mode-light) .st-key-settings_drawer label p,body:has(.theme-mode-light) .st-key-settings_drawer [data-testid="stCaptionContainer"]{color:#172033!important}
+body:has(.theme-mode-light) .st-key-settings_drawer input,body:has(.theme-mode-light) .st-key-settings_drawer textarea,body:has(.theme-mode-light) .st-key-settings_drawer [data-baseweb="select"] > div{background:#f8fafc!important;color:#172033!important;border-color:#94a3b8!important}
+body:has(.theme-mode-light) .settings-profile-card{background:#effaff!important;border-color:#38bdf8!important;color:#172033!important}
+body:has(.theme-mode-light) .settings-profile-name,body:has(.theme-mode-light) .settings-profile-detail,body:has(.theme-mode-light) .settings-profile-days{color:#172033!important}
+body:has(.theme-mode-light) .stAlert{background:#ffffff!important;color:#172033!important}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -965,6 +986,8 @@ GEMINI_TRANSLATION_MODEL_OPTIONS = [
     "gemini-2.5-pro",
 ]
 DEFAULT_GEMINI_TRANSLATION_MODEL = "gemini-3.6-flash"
+THEME_MODE_OPTIONS = ("Dark", "Light")
+
 GEMINI_TRANSLATION_MODEL_LABELS = {
     "gemini-3.6-flash": "⭐ Gemini 3.6 Flash — ណែនាំ: លឿន និងគុណភាពល្អ",
     "gemini-3.7-flash": "✨ Gemini 3.7 Flash — គុណភាពខ្ពស់",
@@ -984,6 +1007,7 @@ ACCOUNT_SETTINGS_DEFAULTS = {
     "lite_mode": False,
     "audio_sync_mode": "Speed Up Only",
     "voice_mode": "Auto",
+    "theme_mode": "Dark",
 }
 
 
@@ -3661,6 +3685,8 @@ if st.session_state.get("audio_sync_mode") not in AUDIO_SYNC_OPTIONS:
     st.session_state.audio_sync_mode = "Speed Up Only"
 if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
     st.session_state.voice_mode = "Auto"
+if st.session_state.get("theme_mode") not in THEME_MODE_OPTIONS:
+    st.session_state.theme_mode = "Dark"
 if st.session_state.get("model_selector") not in GEMINI_TRANSLATION_MODEL_OPTIONS:
     st.session_state.model_selector = DEFAULT_GEMINI_TRANSLATION_MODEL
 # Translation provider/style controls are intentionally hidden; keep the original
@@ -3687,6 +3713,10 @@ def _close_settings_drawer():
 
 
 with st.container(key="settings_drawer_toggle"):
+    st.markdown(
+        f'<span class="theme-mode-{st.session_state.theme_mode.lower()}" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     if st.session_state.settings_drawer_open:
         st.markdown('<span class="settings-toggle-state-open" aria-hidden="true"></span>', unsafe_allow_html=True)
     else:
@@ -3702,6 +3732,17 @@ with st.container(key="settings_drawer"):
         st.markdown('<span class="settings-drawer-state-open" aria-hidden="true"></span>', unsafe_allow_html=True)
     else:
         st.markdown('<span class="settings-drawer-state-closed" aria-hidden="true"></span>', unsafe_allow_html=True)
+    st.markdown('<h3 class="settings-drawer-section">🎨 Appearance</h3>', unsafe_allow_html=True)
+    st.radio(
+        "រូបរាងកម្មវិធី៖",
+        THEME_MODE_OPTIONS,
+        key="theme_mode",
+        horizontal=True,
+        format_func=lambda value: "🌙 Dark Mode" if value == "Dark" else "☀️ Light Mode",
+        on_change=account_settings_changed,
+        help="Theme ត្រូវបានរក្សាទុកតាម Access Code របស់អ្នក។",
+    )
+    st.divider()
     # Reference-style account card using only this authenticated Access Code's data.
     private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
     private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
