@@ -1,0 +1,9 @@
+[server]
+# Match the application-level video validation limit so oversized uploads are
+# rejected before they consume scarce hosting memory.
+maxUploadSize = 150
+
+[client]
+# Public viewers should see the clean application experience rather than
+# developer controls.
+toolbarMode = "viewer"
