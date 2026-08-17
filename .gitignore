@@ -5,7 +5,12 @@ licenses.db-wal
 
 # Local Streamlit secrets and browser/session data
 .streamlit/secrets.toml
-*.cookie
+
+# VPS production environment and local Docker overrides
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
 
 # Python temporary files
 __pycache__/
@@ -16,3 +21,4 @@ __pycache__/
 *.tmp
 ai_khemra_bro_sessions/
 ui_test_asset/
+terminal_full_output/

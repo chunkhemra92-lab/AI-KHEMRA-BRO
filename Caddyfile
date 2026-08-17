@@ -1,0 +1,14 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+    encode zstd gzip
+
+    @health path /healthz
+    handle @health {
+        reverse_proxy app:8501
+    }
+
+    reverse_proxy app:8501
+}

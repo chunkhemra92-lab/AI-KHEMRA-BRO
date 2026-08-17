@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import html
 import json
+import os
 import re
 import secrets
 import sqlite3
@@ -2809,7 +2810,10 @@ def create_mp3(
 # PRIVATE CUSTOMER LOGIN + HIDDEN OWNER LICENSE MANAGEMENT
 # This module adds security only. The original app UI/workflow below is unchanged.
 # ─────────────────────────────────────────────────────────────────────────────
-LICENSE_DB_PATH = Path(__file__).with_name("licenses.db")
+LICENSE_DB_PATH = Path(
+    os.getenv("LICENSE_DB_PATH", str(Path(__file__).with_name("licenses.db")))
+).expanduser()
+LICENSE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SESSION_COOKIE_NAME = "ai_khemra_bro_customer_session"
 LOGIN_COOKIE_NAME = "ai_khemra_bro_saved_login"
 SESSION_IDLE_MINUTES = 30
@@ -2834,10 +2838,14 @@ def _parse_iso(value):
 
 
 def _secret(name, default=""):
+    """Read private values from Streamlit Secrets first, then VPS environment."""
     try:
-        return str(st.secrets.get(name, default)).strip()
+        value = str(st.secrets.get(name, "")).strip()
+        if value:
+            return value
     except Exception:
-        return str(default).strip()
+        pass
+    return str(os.getenv(name, default)).strip()
 
 
 def get_admin_username():
