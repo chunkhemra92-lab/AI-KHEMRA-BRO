@@ -544,10 +544,18 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
 .st-key-settings_drawer [data-testid="stSelectbox"] > div{border-radius:14px!important}
 .st-key-settings_drawer .stCaption{color:#b9c8dc!important;line-height:1.48!important}
 .st-key-main_srt_editor textarea,.st-key-translator_source textarea,.st-key-speech_srt_input textarea,.st-key-plain_text_input textarea{min-height:300px!important;height:300px!important;border-radius:16px!important;background:#1c2a3d!important}
+html{overflow-y:scroll!important;scrollbar-gutter:stable both-edges!important}
+body{overflow-x:hidden!important}
 .st-key-settings_drawer_toggle{position:fixed!important;top:12px!important;left:12px!important;z-index:1000001!important;width:50px!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
 [data-testid="stElementContainer"]:has(.st-key-owner_trigger_container),
 [data-testid="stElementContainer"]:has(.st-key-settings_drawer_toggle),
-[data-testid="stElementContainer"]:has(.st-key-settings_drawer){
+[data-testid="stElementContainer"]:has(.st-key-settings_drawer),
+[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer_toggle),
+[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer),
+[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer_toggle),
+[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer),
+[data-testid="stColumn"]:has(.st-key-settings_drawer_toggle),
+[data-testid="stColumn"]:has(.st-key-settings_drawer){
   position:fixed!important;
   top:0!important;
   left:0!important;
@@ -555,11 +563,19 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   height:0!important;
   min-width:0!important;
   min-height:0!important;
+  max-width:0!important;
+  max-height:0!important;
   margin:0!important;
   padding:0!important;
   overflow:visible!important;
   pointer-events:none!important;
+  flex:none!important;
+  grid-area:auto!important;
 }
+[data-testid="stElementContainer"]:has(.st-key-settings_drawer) .st-key-settings_drawer,
+[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer) .st-key-settings_drawer,
+[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer) .st-key-settings_drawer,
+[data-testid="stColumn"]:has(.st-key-settings_drawer) .st-key-settings_drawer{pointer-events:auto!important}
 .st-key-settings_drawer_toggle button{
   pointer-events:auto!important;width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}

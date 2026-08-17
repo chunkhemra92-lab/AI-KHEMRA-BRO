@@ -10,6 +10,11 @@ assert 'on_click=_close_settings_drawer' in SOURCE
 assert '.st-key-settings_drawer_toggle{position:fixed!important' in SOURCE
 assert '[data-testid="stElementContainer"]:has(.st-key-settings_drawer)' in SOURCE
 assert 'pointer-events:auto!important;position:fixed!important' in SOURCE
+assert 'html{overflow-y:scroll!important;scrollbar-gutter:stable both-edges!important}' in SOURCE
+assert 'body{overflow-x:hidden!important}' in SOURCE
+assert '[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer)' in SOURCE
+assert '[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer)' in SOURCE
+assert '[data-testid="stColumn"]:has(.st-key-settings_drawer)' in SOURCE
 assert 'animation:none!important;transition:none!important;transform:none!important;will-change:auto!important' in SOURCE
 assert 'animation:settings-drawer-door' not in SOURCE
 assert '@keyframes settings-drawer-door' not in SOURCE
