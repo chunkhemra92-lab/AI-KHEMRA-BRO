@@ -45,10 +45,10 @@ REQUIRED_FUNCTIONS = {
 PISITH = "km-KH-PisethNeural"
 SREYMOM = "km-KH-SreymomNeural"
 VOICE_PROFILES = {
-    "M_ADULT": {"voice": PISITH, "rate": "-3%", "pitch": "-3Hz", "volume": "+7%"},
-    "F_ADULT": {"voice": SREYMOM, "rate": "-2%", "pitch": "-1Hz", "volume": "+7%"},
-    "M_THINK": {"voice": PISITH, "rate": "-7%", "pitch": "-4Hz", "volume": "+5%"},
-    "F_THINK": {"voice": SREYMOM, "rate": "-7%", "pitch": "-3Hz", "volume": "+5%"},
+    "M_ADULT": {"voice": PISITH, "rate": "-1%", "pitch": "+0Hz", "volume": "+2%"},
+    "F_ADULT": {"voice": SREYMOM, "rate": "-1%", "pitch": "+0Hz", "volume": "+2%"},
+    "M_THINK": {"voice": PISITH, "rate": "-4%", "pitch": "-2Hz", "volume": "+0%"},
+    "F_THINK": {"voice": SREYMOM, "rate": "-4%", "pitch": "-1Hz", "volume": "+0%"},
 }
 LOCKED_VOICE_PROFILES = {
     "M": VOICE_PROFILES["M_ADULT"],
@@ -62,7 +62,7 @@ namespace = {
     "as_completed": as_completed,
     "contains_cjk": None,
     "DEFAULT_TARGET_LANGUAGE": "Khmer",
-    "EDGE_TTS_MAX_CONCURRENT_REQUESTS": 4,
+    "EDGE_TTS_MAX_CONCURRENT_REQUESTS": 2,
     "EDGE_TTS_REQUEST_TIMEOUT_SECONDS": 75,
     "edge_tts": edge_tts,
     "FFMPEG_CLIP_CONVERSION_TIMEOUT_SECONDS": 180,
