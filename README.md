@@ -8,3 +8,5 @@ Main fix: Gemini model compatibility for Video → Whisper → Khmer SRT → MP3
 - MP3 generation requires valid Khmer subtitle text.
 
 Deploy by replacing `app.py`, keeping `requirements.txt` and `packages.txt`, then redeploying the service.
+
+<!-- Deployment refresh marker: 2026-08-17 -->
