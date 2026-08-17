@@ -21,6 +21,9 @@ assert '[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer),' not in 
 assert '[data-testid="stColumn"]:has(.st-key-settings_drawer){' not in SOURCE
 assert 'animation:none!important;transition:none!important;transform:none!important;will-change:auto!important' in SOURCE
 assert '.st-key-settings_drawer_toggle:has(.settings-toggle-state-open) button' not in SOURCE
+assert '.st-key-settings_drawer:has(.settings-drawer-state-closed){display:none!important' in SOURCE
+assert 'body:has(.settings-toggle-state-closed) .settings-profile-card' in SOURCE
+assert 'body:has(.settings-toggle-state-closed) .st-key-api_key_input_box' in SOURCE
 assert 'animation:settings-drawer-door' not in SOURCE
 assert '@keyframes settings-drawer-door' not in SOURCE
 

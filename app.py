@@ -578,8 +578,14 @@ body{overflow-x:hidden!important}
 [data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer) .st-key-settings_drawer{pointer-events:auto!important}
 .st-key-settings_drawer_toggle button{
   pointer-events:auto!important;width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
-.st-key-settings_drawer:has(.settings-drawer-state-closed){visibility:hidden!important;pointer-events:none!important}
-.st-key-settings_drawer:has(.settings-drawer-state-closed) *{pointer-events:none!important}
+.st-key-settings_drawer:has(.settings-drawer-state-closed){display:none!important;visibility:hidden!important;pointer-events:none!important}
+.st-key-settings_drawer:has(.settings-drawer-state-closed) *{display:none!important;visibility:hidden!important;pointer-events:none!important}
+body:has(.settings-toggle-state-closed) .st-key-settings_drawer,
+body:has(.settings-toggle-state-closed) .settings-profile-card,
+body:has(.settings-toggle-state-closed) .settings-drawer-section,
+body:has(.settings-toggle-state-closed) .settings-save-state,
+body:has(.settings-toggle-state-closed) .settings-ai-connection-banner,
+body:has(.settings-toggle-state-closed) .st-key-api_key_input_box{display:none!important;visibility:hidden!important;pointer-events:none!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
 .st-key-settings_drawer{pointer-events:auto!important;position:fixed!important;top:68px!important;left:12px!important;z-index:1000000!important;width:min(380px,calc(100vw - 38px))!important;height:calc(100dvh - 92px)!important;max-height:calc(100dvh - 92px)!important;box-sizing:border-box!important;margin:0!important;padding:20px 18px 34px!important;overflow-y:auto!important;overscroll-behavior:contain!important;background:#0c1424!important;border:1px solid #23d7f2!important;border-radius:22px!important;box-shadow:16px 12px 38px rgba(0,0,0,.52)!important;color:#f8fafc!important;scrollbar-width:thin;scrollbar-color:#38d9f5 #0c1424;contain:layout paint style;isolation:isolate;animation:none!important;transition:none!important;transform:none!important;will-change:auto!important}
 .st-key-settings_drawer_toggle,.st-key-settings_drawer_toggle *{animation:none!important;transition:none!important;transform:none!important}
