@@ -12,9 +12,12 @@ assert '[data-testid="stElementContainer"]:has(.st-key-settings_drawer)' in SOUR
 assert 'pointer-events:auto!important;position:fixed!important' in SOURCE
 assert 'html{overflow-y:scroll!important;scrollbar-gutter:stable both-edges!important}' in SOURCE
 assert 'body{overflow-x:hidden!important}' in SOURCE
-assert '[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer)' in SOURCE
-assert '[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer)' in SOURCE
-assert '[data-testid="stColumn"]:has(.st-key-settings_drawer)' in SOURCE
+assert '[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer)' in SOURCE
+assert '[data-testid="stHorizontalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer)' in SOURCE
+assert '[data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer)' in SOURCE
+assert '[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer),' not in SOURCE
+assert '[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer),' not in SOURCE
+assert '[data-testid="stColumn"]:has(.st-key-settings_drawer){' not in SOURCE
 assert 'animation:none!important;transition:none!important;transform:none!important;will-change:auto!important' in SOURCE
 assert 'animation:settings-drawer-door' not in SOURCE
 assert '@keyframes settings-drawer-door' not in SOURCE

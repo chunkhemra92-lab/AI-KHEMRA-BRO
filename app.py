@@ -550,12 +550,12 @@ body{overflow-x:hidden!important}
 [data-testid="stElementContainer"]:has(.st-key-owner_trigger_container),
 [data-testid="stElementContainer"]:has(.st-key-settings_drawer_toggle),
 [data-testid="stElementContainer"]:has(.st-key-settings_drawer),
-[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer_toggle),
-[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer),
-[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer_toggle),
-[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer),
-[data-testid="stColumn"]:has(.st-key-settings_drawer_toggle),
-[data-testid="stColumn"]:has(.st-key-settings_drawer){
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer_toggle),
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer),
+[data-testid="stHorizontalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer_toggle),
+[data-testid="stHorizontalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer),
+[data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer_toggle),
+[data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer){
   position:fixed!important;
   top:0!important;
   left:0!important;
@@ -573,9 +573,9 @@ body{overflow-x:hidden!important}
   grid-area:auto!important;
 }
 [data-testid="stElementContainer"]:has(.st-key-settings_drawer) .st-key-settings_drawer,
-[data-testid="stVerticalBlock"]:has(.st-key-settings_drawer) .st-key-settings_drawer,
-[data-testid="stHorizontalBlock"]:has(.st-key-settings_drawer) .st-key-settings_drawer,
-[data-testid="stColumn"]:has(.st-key-settings_drawer) .st-key-settings_drawer{pointer-events:auto!important}
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer) .st-key-settings_drawer,
+[data-testid="stHorizontalBlock"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer) .st-key-settings_drawer,
+[data-testid="stColumn"]:has(> [data-testid="stElementContainer"] .st-key-settings_drawer) .st-key-settings_drawer{pointer-events:auto!important}
 .st-key-settings_drawer_toggle button{
   pointer-events:auto!important;width:50px!important;height:46px!important;min-height:46px!important;padding:0!important;border:1px solid #90a5c2!important;border-radius:14px!important;background:#111827!important;color:#ffffff!important;font-size:22px!important;line-height:1!important;box-shadow:0 7px 18px rgba(0,0,0,.28)!important}
 .st-key-settings_drawer_toggle button:hover{border-color:#31d9f4!important;background:#16233a!important;color:#ffffff!important}
