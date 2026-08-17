@@ -5,9 +5,9 @@ SOURCE = Path(__file__).with_name("app.py").read_text(encoding="utf-8")
 
 assert "def _toggle_settings_drawer():" in SOURCE
 assert "def _open_settings_drawer():" in SOURCE
-assert "def _close_settings_drawer():" in SOURCE
 assert 'on_click=_toggle_settings_drawer' in SOURCE
-assert 'on_click=_close_settings_drawer' in SOURCE
+assert '✕ បិទ Settings' not in SOURCE
+assert 'on_click=_close_settings_drawer' not in SOURCE
 assert '.st-key-settings_drawer_toggle{position:fixed!important' in SOURCE
 assert '[data-testid="stElementContainer"]:has(.st-key-settings_drawer)' in SOURCE
 assert 'pointer-events:auto!important;position:fixed!important' in SOURCE

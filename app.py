@@ -3766,10 +3766,6 @@ with st.container(key="settings_drawer"):
         st.markdown('<span class="settings-drawer-state-open" aria-hidden="true"></span>', unsafe_allow_html=True)
     else:
         st.markdown('<span class="settings-drawer-state-closed" aria-hidden="true"></span>', unsafe_allow_html=True)
-    st.button(
-        "✕ បិទ Settings", key="close_settings_drawer", use_container_width=True,
-        on_click=_close_settings_drawer,
-    )
     # Reference-style account card using only this authenticated Access Code's data.
     private_expiry = _parse_iso(login_row["expires_at"]).astimezone()
     private_plan = str(dict(login_row).get("plan_label") or "កញ្ចប់សមាជិក")
