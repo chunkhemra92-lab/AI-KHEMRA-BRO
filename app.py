@@ -24,6 +24,8 @@ import edge_tts
 import extra_streamlit_components as stx
 import streamlit as st
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
@@ -283,6 +285,9 @@ html, body, [data-testid="stAppViewContainer"], .stApp{
   background:#0ea5e9!important;
   box-sizing:border-box!important;
 }
+.st-key-srt_editor_toolbar{margin:9px 0 4px!important;padding:8px!important;border:1px solid var(--line)!important;border-radius:14px!important;background:rgba(15,28,47,.58)!important}
+.st-key-srt_editor_toolbar .stButton>button{min-height:40px!important;border-radius:10px!important;font-size:12px!important;background:rgba(22,107,177,.88)!important;box-shadow:none!important}
+.st-key-srt_editor_toolbar .stCaption{color:#8fa3bb!important;font-size:11px!important;padding-top:8px!important}
 .st-key-srt_actions div[data-testid="stHorizontalBlock"]{
   display:grid!important;
   grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
@@ -966,6 +971,7 @@ def translation_prompt_for_style(style):
 TRANSLATION_PROVIDER_OPTIONS = ["Gemini", "Google Cloud Translation"]
 AUDIO_SYNC_OPTIONS = ["Speed Up Only", "Speed Up & Slow Down"]
 VOICE_MODE_OPTIONS = ["Auto", "All Male", "All Female"]
+SPEECH_PROVIDER_OPTIONS = ["Edge TTS", "Google Cloud", "ElevenLabs"]
 SOURCE_LANGUAGE_OPTIONS = {
     "🇰🇭 ភាសាខ្មែរ": {"code": "km", "name": "Khmer"},
     "🇨🇳 ភាសាចិន": {"code": "zh", "name": "Chinese"},
@@ -1024,6 +1030,7 @@ ACCOUNT_SETTINGS_DEFAULTS = {
     "lite_mode": False,
     "audio_sync_mode": "Speed Up Only",
     "voice_mode": "Auto",
+    "speech_provider": "Edge TTS",
     "theme_mode": "Dark",
 }
 
@@ -2461,6 +2468,101 @@ async def synthesize(text, profile, output_path):
     raise RuntimeError(f'Edge TTS មិនបានផ្ញើសំឡេង៖ {last_error or "unknown error"}')
 
 
+def _google_cloud_access_token(service_account_json):
+    """Create a short-lived Google Cloud OAuth token without storing credentials on disk."""
+    account = json.loads(service_account_json)
+    now = int(time.time())
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "RS256", "typ": "JWT"}, separators=(",", ":")).encode()).rstrip(b"=").decode()
+    payload = base64.urlsafe_b64encode(json.dumps({
+        "iss": account["client_email"],
+        "scope": "https://www.googleapis.com/auth/cloud-platform",
+        "aud": "https://oauth2.googleapis.com/token",
+        "iat": now,
+        "exp": now + 3600,
+    }, separators=(",", ":")).encode()).rstrip(b"=").decode()
+    unsigned = f"{header}.{payload}".encode()
+    private_key = serialization.load_pem_private_key(
+        account["private_key"].encode(), password=None
+    )
+    signature = private_key.sign(unsigned, padding.PKCS1v15(), hashes.SHA256())
+    assertion = f"{header}.{payload}." + base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
+    body = urlparse.urlencode({
+        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        "assertion": assertion,
+    }).encode()
+    request = urlrequest.Request(
+        "https://oauth2.googleapis.com/token",
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urlrequest.urlopen(request, timeout=30) as response:
+        token_response = json.loads(response.read().decode("utf-8"))
+    return token_response["access_token"]
+
+
+def synthesize_google_cloud(text, output_path):
+    service_account_json = _secret("GOOGLE_CLOUD_TTS_SERVICE_ACCOUNT_JSON")
+    if not service_account_json:
+        raise RuntimeError("មិនទាន់កំណត់ Google Cloud TTS service account ទេ។")
+    voice_name = _secret("GOOGLE_CLOUD_TTS_VOICE", "km-KH-Wavenet-A")
+    token = _google_cloud_access_token(service_account_json)
+    request = urlrequest.Request(
+        "https://texttospeech.googleapis.com/v1/text:synthesize",
+        data=json.dumps({
+            "input": {"text": prepare_tts_text(text)},
+            "voice": {"languageCode": "km-KH", "name": voice_name},
+            "audioConfig": {"audioEncoding": "MP3"},
+        }).encode("utf-8"),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlrequest.urlopen(request, timeout=60) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    Path(output_path).write_bytes(base64.b64decode(payload["audioContent"]))
+
+
+def synthesize_elevenlabs(text, output_path):
+    api_key = _secret("ELEVENLABS_API_KEY")
+    voice_id = _secret("ELEVENLABS_VOICE_ID")
+    if not api_key or not voice_id:
+        raise RuntimeError("មិនទាន់កំណត់ ElevenLabs API Key ឬ Voice ID ទេ។")
+    model_id = _secret("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+    request = urlrequest.Request(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{urlparse.quote(voice_id, safe='')}",
+        data=json.dumps({
+            "text": prepare_tts_text(text),
+            "model_id": model_id,
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.15, "use_speaker_boost": True},
+        }).encode("utf-8"),
+        headers={"xi-api-key": api_key, "Content-Type": "application/json", "Accept": "audio/mpeg"},
+        method="POST",
+    )
+    with urlrequest.urlopen(request, timeout=60) as response:
+        Path(output_path).write_bytes(response.read())
+
+
+def synthesize_with_provider(text, profile, output_path, speech_provider="Edge TTS"):
+    """Use the selected premium provider, falling back to the proven Edge path on provider failure."""
+    output_path = Path(output_path)
+    if speech_provider == "Google Cloud":
+        try:
+            synthesize_google_cloud(text, output_path)
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            run_async(synthesize(text, profile, output_path))
+    elif speech_provider == "ElevenLabs":
+        try:
+            synthesize_elevenlabs(text, output_path)
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            run_async(synthesize(text, profile, output_path))
+    else:
+        run_async(synthesize(text, profile, output_path))
+    if not output_path.exists() or output_path.stat().st_size <= 500:
+        raise RuntimeError("មិនអាចបង្កើតសំឡេងពី provider ដែលបានជ្រើសបានទេ។")
+
+
 def convert_tts_clip_to_pcm(source_path, output_path):
     """Convert an Edge TTS MP3 to deterministic PCM before timing and mixing."""
     result = subprocess.run(
@@ -2579,6 +2681,7 @@ def effective_voice_tag(tag, voice_mode):
 def create_mp3(
     srt_text, progress_callback=None, audio_sync_mode="Speed Up Only", voice_mode="Auto",
     target_language=DEFAULT_TARGET_LANGUAGE, music_path=None, ambience_path=None,
+    speech_provider="Edge TTS",
 ):
     """
     Create one synchronized Khmer MP3.
@@ -2623,7 +2726,7 @@ def create_mp3(
             profile = LOCKED_VOICE_PROFILES[cue['effective_tag']]
             raw_clip = root / f'raw_clip_{index:04d}.mp3'
             try:
-                run_async(synthesize(cue['text'], profile, raw_clip))
+                synthesize_with_provider(cue['text'], profile, raw_clip, speech_provider)
                 convert_tts_clip_to_pcm(raw_clip, clips[index])
                 return index, probe_audio_duration(clips[index])
             finally:
@@ -3710,6 +3813,8 @@ if st.session_state.get("audio_sync_mode") not in AUDIO_SYNC_OPTIONS:
     st.session_state.audio_sync_mode = "Speed Up Only"
 if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
     st.session_state.voice_mode = "Auto"
+if st.session_state.get("speech_provider") not in SPEECH_PROVIDER_OPTIONS:
+    st.session_state.speech_provider = "Edge TTS"
 if st.session_state.get("theme_mode") not in THEME_MODE_OPTIONS:
     st.session_state.theme_mode = "Dark"
 if st.session_state.get("model_selector") not in GEMINI_TRANSLATION_MODEL_OPTIONS:
@@ -3835,6 +3940,32 @@ with st.container(key="settings_drawer"):
         help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
     )
 
+    st.markdown('<h3 class="settings-drawer-section">🎚️ Speech Provider</h3>', unsafe_allow_html=True)
+    st.selectbox(
+        "ជ្រើស provider សម្រាប់បង្កើតសំឡេង៖",
+        SPEECH_PROVIDER_OPTIONS,
+        key="speech_provider",
+        on_change=account_settings_changed,
+        format_func=lambda value: {
+            "Edge TTS": "⚡ Edge TTS · Built-in fallback",
+            "Google Cloud": "☁️ Google Cloud · Premium Khmer route",
+            "ElevenLabs": "✨ ElevenLabs · Premium neural route",
+        }[value],
+    )
+    selected_speech_provider = st.session_state.speech_provider
+    if selected_speech_provider == "Google Cloud":
+        if _secret("GOOGLE_CLOUD_TTS_SERVICE_ACCOUNT_JSON"):
+            st.success("✅ Google Cloud ready · fallback to Edge TTS is enabled")
+        else:
+            st.warning("⚠️ Google Cloud credentials are not configured; generation will safely fall back to Edge TTS.")
+    elif selected_speech_provider == "ElevenLabs":
+        if _secret("ELEVENLABS_API_KEY") and _secret("ELEVENLABS_VOICE_ID"):
+            st.success("✅ ElevenLabs ready · fallback to Edge TTS is enabled")
+        else:
+            st.warning("⚠️ ElevenLabs API Key/Voice ID are not configured; generation will safely fall back to Edge TTS.")
+    else:
+        st.caption("Edge TTS remains the no-key fallback, so switching providers never blocks the project.")
+
     st.divider()
     st.markdown('<h3 class="settings-drawer-section">🧠 AI Model (ជ្រើស AI)</h3>', unsafe_allow_html=True)
     if st.session_state.translation_provider == "Gemini":
@@ -3860,6 +3991,7 @@ translation_provider = st.session_state.translation_provider
 google_translate_api_key = st.session_state.get("google_translate_api_key", "").strip()
 audio_sync_mode = st.session_state.audio_sync_mode
 voice_mode = st.session_state.voice_mode
+speech_provider = st.session_state.speech_provider
 model = st.session_state.model_selector
 lite_mode = False
 st.session_state.lite_mode = False
@@ -4007,12 +4139,33 @@ with tab_video:
         st.session_state.main_srt_editor = st.session_state.srt_text
 
     st.text_area(
-        "SRT Editor",
+        "SRT Editor · កែសម្រួលមុនបង្កើតសំឡេង",
         height=SRT_INPUT_HEIGHT,
         label_visibility="collapsed",
+        help="អ្នកអាចកែ timestamp, speaker tag និងអត្ថបទខ្មែរផ្ទាល់នៅទីនេះ។ ការកែប្រែត្រូវបានប្រើភ្លាមៗពេលចុចបង្កើតសំឡេង។",
         key="main_srt_editor",
     )
     st.session_state.srt_text = st.session_state.main_srt_editor
+
+    with st.container(key="srt_editor_toolbar"):
+        editor_col1, editor_col2, editor_col3 = st.columns([1.1, 1.1, 1.4], gap="small")
+        with editor_col1:
+            if st.button("✅ ពិនិត្យ SRT", key="validate_main_srt", use_container_width=True):
+                parsed_editor_cues = parse_srt(st.session_state.srt_text)
+                if parsed_editor_cues:
+                    st.success(f"✅ SRT ត្រឹមត្រូវ · {len(parsed_editor_cues)} បន្ទាត់")
+                else:
+                    st.error("❌ មិនឃើញ timestamp ឬអត្ថបទត្រឹមត្រូវទេ។")
+        with editor_col2:
+            if st.button("↩️ ស្តារវិញ", key="restore_source_srt", use_container_width=True):
+                restored_srt = st.session_state.get("source_srt_text", "")
+                st.session_state.main_srt_editor = restored_srt
+                st.session_state.srt_text = restored_srt
+                st.session_state.audio_bytes = None
+                st.rerun()
+        with editor_col3:
+            editor_cue_count = len(parse_srt(st.session_state.srt_text)) if st.session_state.srt_text.strip() else 0
+            st.caption(f"{editor_cue_count} cues · ការកែប្រែរក្សាទុកក្នុង project នេះ")
 
     # Keep both SRT action buttons on one row directly below the editor,
     # including portrait and landscape mobile screens.
@@ -4104,6 +4257,7 @@ with tab_video:
                         audio_sync_mode=audio_sync_mode,
                         voice_mode=voice_mode,
                         target_language=target_language,
+                        speech_provider=speech_provider,
                         music_path=music_path,
                         ambience_path=ambience_path,
                     )
@@ -4244,6 +4398,7 @@ with tab_srt_speech:
                         audio_sync_mode=audio_sync_mode,
                         voice_mode=voice_mode,
                         target_language=target_language,
+                        speech_provider=speech_provider,
                         music_path=music_path,
                         ambience_path=ambience_path,
                     )
