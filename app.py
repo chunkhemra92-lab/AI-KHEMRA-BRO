@@ -33,42 +33,53 @@ st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬',
 
 st.markdown('''
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 :root{
-  --bg:#080d15;
-  --panel:#111827;
-  --panel2:#182438;
-  --text:#f8fafc;
-  --muted:#9ca3af;
-  --cyan:#38bdf8;
-  --ocean:#0284c7;
-  --ocean2:#22d3ee;
-  --pink:#38bdf8;
+  --bg:#070b14;
+  --panel:#101827;
+  --panel2:#162338;
+  --text:#f6f9ff;
+  --muted:#8b9ab0;
+  --cyan:#48d9ff;
+  --ocean:#1976d2;
+  --ocean2:#33c9ee;
+  --pink:#a78bfa;
+  --line:rgba(148,163,184,.16);
 }
-.stApp{background:var(--bg);color:var(--text)}
-.block-container{max-width:1180px;padding-top:.55rem;padding-bottom:3rem}
+.stApp{background:radial-gradient(circle at 50% -10%,rgba(25,118,210,.17),transparent 32rem),var(--bg);color:var(--text);font-family:'Manrope','Noto Sans Khmer',sans-serif}
+.block-container{max-width:1180px;padding-top:.8rem;padding-bottom:3rem}
 [data-testid="stHeader"],[data-testid="stToolbar"],[data-testid="stDecoration"],
 [data-testid="stStatusWidget"],#MainMenu,footer{display:none!important}
 
 .hero{
-  border:2px solid var(--ocean2);border-radius:24px;padding:34px 18px;
-  text-align:center;background:linear-gradient(145deg,#17171d,#0b1018);
-  box-shadow:0 0 24px rgba(34,211,238,.24);margin:0 0 18px;
+  border:1px solid rgba(72,217,255,.35);border-radius:24px;padding:34px 18px;
+  text-align:center;background:linear-gradient(145deg,rgba(22,36,61,.94),rgba(8,14,25,.96));
+  box-shadow:0 20px 50px rgba(0,0,0,.22),0 0 35px rgba(34,211,238,.12),inset 0 1px rgba(255,255,255,.06);margin:0 0 18px;
 }
-.hero h1{font-size:44px;margin:0 0 8px;font-weight:900;white-space:normal;line-height:1.05}.hero .app-version{display:inline-block;margin-left:.16em;font-size:.34em;letter-spacing:.02em;vertical-align:middle;color:#67e8f9;font-weight:800}
-.hero p{margin:0;color:#23c8ef;font-weight:800;letter-spacing:1.5px}
-.section-title{font-size:30px;font-weight:900;margin:22px 0 10px}
-.ok{background:#073d31;border:1px solid #10b981;border-radius:14px;padding:13px 15px;margin:10px 0}
-.side-ok{background:#073d31;border:1px solid #10b981;border-radius:12px;padding:12px;margin:10px 0}
+.hero h1{font-family:'Space Grotesk',sans-serif;font-size:44px;margin:0 0 8px;font-weight:700;white-space:normal;line-height:1.05;letter-spacing:-1.5px}.hero .app-version{display:inline-block;margin-left:.16em;font-size:.34em;letter-spacing:.02em;vertical-align:middle;color:#8deeff;font-weight:800}
+.hero p{margin:0;color:#63ddf5;font-weight:700;letter-spacing:1.5px;font-size:13px}
+.section-title{font-family:'Space Grotesk',sans-serif;font-size:29px;font-weight:700;margin:24px 0 12px;letter-spacing:-.6px}
+.ok{background:linear-gradient(135deg,rgba(12,78,62,.72),rgba(6,48,44,.72));border:1px solid rgba(52,211,153,.45);border-radius:14px;padding:13px 15px;margin:10px 0}
+.side-ok{background:linear-gradient(135deg,rgba(12,78,62,.72),rgba(6,48,44,.72));border:1px solid rgba(52,211,153,.45);border-radius:12px;padding:12px;margin:10px 0}
 .stButton>button{
-  width:100%;min-height:48px;border:0;border-radius:11px;color:white;
-  font-weight:850;font-size:15px;background:linear-gradient(90deg,#0284c7,#22d3ee)
+  width:100%;min-height:50px;border:1px solid rgba(120,220,255,.22);border-radius:13px;color:white;
+  font-weight:800;font-size:15px;background:linear-gradient(100deg,#126bc1,#22bddc);box-shadow:0 8px 22px rgba(9,126,190,.18);transition:transform .18s ease,filter .18s ease,box-shadow .18s ease
 }
 .stButton>button:hover,.stDownloadButton>button:hover{
-  filter:brightness(1.08);transform:translateY(-1px);border-color:#a5f3fc!important;
+  filter:brightness(1.09);transform:translateY(-2px);border-color:#a5f3fc!important;box-shadow:0 11px 28px rgba(9,173,220,.25)!important;
 }
-.stDownloadButton>button{width:100%;min-height:46px;border:0!important;border-radius:11px!important;font-weight:850!important;color:white!important;background:linear-gradient(90deg,#0284c7,#22d3ee)!important;box-shadow:0 6px 18px rgba(2,132,199,.22)!important}
+.stDownloadButton>button{width:100%;min-height:50px;border:1px solid rgba(120,220,255,.22)!important;border-radius:13px!important;font-weight:800!important;color:white!important;background:linear-gradient(100deg,#126bc1,#22bddc)!important;box-shadow:0 8px 22px rgba(2,132,199,.18)!important}
 .st-key-generate_srt, .st-key-generate_srt > div, .st-key-generate_srt button{width:100%!important;max-width:100%!important;display:block!important;box-sizing:border-box!important}
-div[data-testid="stFileUploader"]{background:#eef2f7;border-radius:12px;padding:8px}
+div[data-testid="stFileUploader"]{background:linear-gradient(145deg,#edf3fb,#dfe8f5);border:1px solid rgba(148,163,184,.42);border-radius:18px;padding:10px;box-shadow:0 10px 28px rgba(0,0,0,.12)}
+div[data-testid="stFileUploader"] section{border:0!important;background:transparent!important;padding:6px!important}
+div[data-testid="stFileUploader"] small{color:#53657d!important;font-weight:600!important}
+div[data-testid="stProgress"]{margin:14px 0 9px!important}
+div[data-testid="stProgress"] > div{height:10px!important;border-radius:999px!important;background:#e6edf6!important;border:1px solid rgba(148,163,184,.25)!important;overflow:hidden!important}
+div[data-testid="stProgress"] > div > div{height:100%!important;border-radius:999px!important;background:linear-gradient(90deg,#2483d7,#27c6dd)!important;box-shadow:0 0 14px rgba(39,198,221,.4)!important}
+div[data-testid="stCheckbox"]{margin:10px 0 8px!important}
+div[data-testid="stCheckbox"] label{color:#d7e3f2!important;font-weight:700!important}
+div[data-testid="stAlert"]{border-radius:14px!important;border:1px solid rgba(72,217,255,.22)!important;background:rgba(15,35,58,.72)!important}
+div[data-testid="stAlert"] p{font-size:14px!important;line-height:1.55!important}
 div[data-testid="stTextArea"] textarea{
   background:#182438!important;color:#fff!important;border:1px solid #8290a4!important;
   border-radius:10px!important;font-size:16px!important;line-height:1.65!important;
@@ -99,22 +110,22 @@ div[data-testid="stTextInput"] input{
 }
 /* Beautiful mobile tab menu: all 4 tabs stay fully visible. */
 div[data-baseweb="tab-list"]{
-  gap:8px!important;
-  background:#0f1726!important;
-  border:1px solid #263349!important;
-  border-radius:14px!important;
-  padding:7px!important;
+  gap:6px!important;
+  background:rgba(15,23,38,.9)!important;
+  border:1px solid var(--line)!important;
+  border-radius:16px!important;
+  padding:6px!important;
   overflow:visible!important;
 }
 button[data-baseweb="tab"]{
-  background:#151f31!important;
-  border:1px solid #2b3950!important;
-  border-radius:10px!important;
+  background:transparent!important;
+  border:1px solid transparent!important;
+  border-radius:11px!important;
   padding:11px 13px!important;
   min-height:46px!important;
-  color:#aeb8c7!important;
+  color:#91a1b7!important;
   font-size:14px!important;
-  font-weight:800!important;
+  font-weight:700!important;
   justify-content:center!important;
   white-space:normal!important;
   text-align:center!important;
@@ -128,10 +139,10 @@ button[data-baseweb="tab"] span{
   font-weight:800!important;
 }
 button[data-baseweb="tab"][aria-selected="true"]{
-  background:linear-gradient(90deg,#0284c7,#22d3ee)!important;
-  border-color:#67e8f9!important;
+  background:linear-gradient(100deg,rgba(25,118,210,.95),rgba(34,189,220,.95))!important;
+  border-color:rgba(141,238,255,.72)!important;
   color:white!important;
-  box-shadow:0 5px 16px rgba(2,132,199,.28)!important;
+  box-shadow:0 6px 18px rgba(2,132,199,.24)!important;
 }
 .clear-wrap .stButton>button{
   background:linear-gradient(90deg,#0369a1,#22d3ee);color:#ffffff;font-weight:900
@@ -183,10 +194,10 @@ div[data-baseweb="popover"] .st-key-api_keys_manager textarea{
 
 @media(max-width:700px){
   .block-container{padding-left:.55rem!important;padding-right:.55rem!important;padding-top:.35rem!important}
-  .hero{padding:28px 8px 24px!important;border-radius:18px!important;margin-bottom:14px!important}
+  .hero{padding:26px 8px 23px!important;border-radius:20px!important;margin-bottom:14px!important}
   .hero h1{font-size:clamp(28px,9vw,42px)!important;letter-spacing:-1px!important}
   .hero p{font-size:clamp(9px,2.7vw,12px)!important;letter-spacing:.8px!important;line-height:1.35!important}
-  .section-title{font-size:26px}
+  .section-title{font-size:25px;line-height:1.15}
   div[data-baseweb="tab-list"]{
     display:grid!important;
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
