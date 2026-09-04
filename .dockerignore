@@ -20,3 +20,15 @@ __pycache__/
 ai_khemra_bro_sessions/
 ui_test_asset/
 terminal_full_output/
+
+# Development-only test and audit tooling; not needed by the production image
+test_*.py
+audit_source.py
+generate_four_voice_reference_samples.py
+render_four_tag_srt_test.py
+
+# Historical engineering notes and generated QA artifacts; not needed at runtime
+*.md
+!README.md
+!DEPLOY_VPS.md
+v6_2_audio_metrics.json
