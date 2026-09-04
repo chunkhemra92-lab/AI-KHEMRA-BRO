@@ -2823,7 +2823,7 @@ LICENSE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SESSION_COOKIE_NAME = "ai_khemra_bro_customer_session"
 LOGIN_COOKIE_NAME = "ai_khemra_bro_saved_login"
 SESSION_IDLE_MINUTES = 30
-LOGIN_WINDOW_MINUTES = 15
+LOGIN_WINDOW_MINUTES = 5
 MAX_LOGIN_ATTEMPTS = 5
 NEW_LICENSE_CARD_HOURS = 24
 
