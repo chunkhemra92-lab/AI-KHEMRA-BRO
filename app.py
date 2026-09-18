@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5"
+APP_VERSION = "6.5.1"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -1000,6 +1000,7 @@ MAX_VIDEO_DURATION_SECONDS = 15 * 60
 # Stable text models from the Google AI Studio / Gemini API catalog. These values
 # are exact API endpoint identifiers, stored privately per Access Code.
 GEMINI_TRANSLATION_MODEL_OPTIONS = [
+    "gemini-3.8-flash",
     "gemini-3.6-flash",
     "gemini-3.7-flash",
     "gemini-3.5-flash",
@@ -1008,10 +1009,11 @@ GEMINI_TRANSLATION_MODEL_OPTIONS = [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
 ]
-DEFAULT_GEMINI_TRANSLATION_MODEL = "gemini-3.6-flash"
+DEFAULT_GEMINI_TRANSLATION_MODEL = "gemini-3.8-flash"
 THEME_MODE_OPTIONS = ("Dark", "Light")
 
 GEMINI_TRANSLATION_MODEL_LABELS = {
+    "gemini-3.8-flash": "🚀 Gemini 3.8 Flash — ថ្មីបំផុត និងណែនាំ",
     "gemini-3.6-flash": "⭐ Gemini 3.6 Flash — ណែនាំ: លឿន និងគុណភាពល្អ",
     "gemini-3.7-flash": "✨ Gemini 3.7 Flash — គុណភាពខ្ពស់",
     "gemini-3.5-flash": "⚖️ Gemini 3.5 Flash — សមតុល្យ",
