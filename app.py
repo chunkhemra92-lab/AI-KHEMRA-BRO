@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.1"
+APP_VERSION = "6.5.2"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -1006,7 +1006,10 @@ GEMINI_TRANSLATION_MODEL_OPTIONS = [
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-3-flash-preview",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
 ]
 DEFAULT_GEMINI_TRANSLATION_MODEL = "gemini-3.8-flash"
@@ -1019,7 +1022,10 @@ GEMINI_TRANSLATION_MODEL_LABELS = {
     "gemini-3.5-flash": "⚖️ Gemini 3.5 Flash — សមតុល្យ",
     "gemini-3.5-flash-lite": "⚡ Gemini 3.5 Flash-Lite — លឿន និងសន្សំ",
     "gemini-3.1-flash-lite": "🚀 Gemini 3.1 Flash-Lite — សន្សំថវិកា",
+    "gemini-3.1-pro-preview": "🧠 Gemini 3.1 Pro — Preview: reasoning ខ្ពស់",
+    "gemini-3-flash-preview": "✨ Gemini 3 Flash — Preview",
     "gemini-2.5-flash": "🔄 Gemini 2.5 Flash — សម្រាប់ API Key ចាស់",
+    "gemini-2.5-flash-lite": "⚡ Gemini 2.5 Flash-Lite — លឿន និងសន្សំ",
     "gemini-2.5-pro": "🧠 Gemini 2.5 Pro — គុណភាពខ្ពស់ (យឺត/ថ្លៃជាង)",
 }
 ACCOUNT_SETTINGS_DEFAULTS = {

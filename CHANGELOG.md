@@ -1,5 +1,11 @@
 # Changelog
 
+## v6.5.2 — Complete Gemini 2.5–3.8 translation model catalog
+
+This patch exposes the full supported text-translation catalog to every signed-in user: Gemini 2.5 Flash, 2.5 Flash-Lite, 2.5 Pro, Gemini 3 Flash Preview, 3.1 Flash-Lite, 3.1 Pro Preview, 3.5 Flash, 3.5 Flash-Lite, 3.6 Flash, 3.7 Flash, and 3.8 Flash. Live voice and TTS-only endpoints are intentionally excluded from the text translator.
+
+Every translation batch preserves input cue IDs and retries missing output lines before failing, so a successful translation cannot silently omit subtitle text.
+
 ## v6.5.1 — Gemini 3.8 Flash integration
 
 This patch adds official Google AI Studio / Gemini API model `gemini-3.8-flash` as the preferred translation model. Existing Gemini model options remain available as automatic fallbacks for older or restricted API keys.
