@@ -31,6 +31,7 @@ REQUIRED_FUNCTIONS = {
     "normalize_dialogue",
     "prepare_tts_text",
     "synthesize",
+    "synthesize_with_provider",
     "probe_audio_duration",
     "atempo_chain",
     "effective_voice_tag",

@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.4"
+APP_VERSION = "6.5"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
