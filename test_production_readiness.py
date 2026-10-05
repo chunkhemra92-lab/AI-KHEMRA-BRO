@@ -3,10 +3,12 @@ import tomllib
 
 ROOT = Path(__file__).parent
 SOURCE = (ROOT / "app.py").read_text(encoding="utf-8")
+REQUIREMENTS = (ROOT / "requirements.txt").read_text(encoding="utf-8")
 CONFIG_PATH = ROOT / ".streamlit" / "config.toml"
 
 assert 'EDGE_TTS_MAX_CONCURRENT_REQUESTS = 2' in SOURCE
 assert 'FFMPEG_FINAL_MIX_TIMEOUT_SECONDS = 900' in SOURCE
+assert "av>=11,<19" in REQUIREMENTS, "PyAV must stay compatible with faster-whisper metadata_errors usage"
 assert 'sqlite3.connect(str(LICENSE_DB_PATH), timeout=30)' in SOURCE
 assert 'PRAGMA journal_mode=WAL' in SOURCE
 assert 'PRAGMA busy_timeout=30000' in SOURCE

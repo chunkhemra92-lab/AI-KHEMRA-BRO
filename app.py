@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.2"
+APP_VERSION = "6.5.3"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -958,7 +958,9 @@ VOICE_THOUGHT_RELATIVE_GAIN_DB = -1.5
 FINAL_MASTER_TARGET_LUFS = -16
 FINAL_MASTER_TRUE_PEAK_DB = -1.5
 MIN_VOICE_GAP_MS = 12
-MAX_TEMPO_SPEED = 1.65
+# Keep timing correction within a more natural speech range. Larger changes
+# make Khmer neural voices sound rushed or metallic, especially on short cues.
+MAX_TEMPO_SPEED = 1.35
 # Bounded service calls keep one temporary provider failure from blocking an entire project.
 EDGE_TTS_REQUEST_TIMEOUT_SECONDS = 75
 EDGE_TTS_MAX_CONCURRENT_REQUESTS = 2
@@ -1207,7 +1209,7 @@ ACCOUNT_SETTINGS_DEFAULTS = {
     "google_translate_api_key": "",
     "model_selector": DEFAULT_GEMINI_TRANSLATION_MODEL,
     "lite_mode": False,
-    "audio_sync_mode": "Speed Up Only",
+    "audio_sync_mode": "Speed Up & Slow Down",
     "voice_mode": "Auto",
     "speech_provider": "Edge TTS",
     "theme_mode": "Dark",
@@ -1849,6 +1851,8 @@ def extract_audio(video_path, audio_path):
 def _standardize_whisper_segments(segments):
     """Split ASR output into readable, timing-accurate subtitle cues."""
     cues = []
+    # This is the maximum duration of one subtitle cue, not a video limit.
+    # The full video limit is MAX_VIDEO_DURATION_SECONDS below.
     max_duration = 5.5
     max_chars = 34
     punctuation = set("。！？!?；;，,")
@@ -3983,7 +3987,7 @@ if st.session_state.get("translation_style") not in TRANSLATION_STYLE_OPTIONS:
 if st.session_state.get("translation_provider") not in TRANSLATION_PROVIDER_OPTIONS:
     st.session_state.translation_provider = "Gemini"
 if st.session_state.get("audio_sync_mode") not in AUDIO_SYNC_OPTIONS:
-    st.session_state.audio_sync_mode = "Speed Up Only"
+    st.session_state.audio_sync_mode = "Speed Up & Slow Down"
 if st.session_state.get("voice_mode") not in VOICE_MODE_OPTIONS:
     st.session_state.voice_mode = "Auto"
 if st.session_state.get("speech_provider") not in SPEECH_PROVIDER_OPTIONS:
@@ -4101,7 +4105,7 @@ with st.container(key="settings_drawer"):
         "កំណត់ល្បឿនសំឡេង៖", AUDIO_SYNC_OPTIONS, key="audio_sync_mode",
         format_func=lambda value: "⚡ Speed Up Only" if value == "Speed Up Only" else "↔️ Speed Up & Slow Down",
         on_change=account_settings_changed,
-        help="Speed Up Only រក្សាសំឡេងធម្មជាតិ។ Speed Up & Slow Down ប្រើពេលទំនេរដើម្បីនិយាយច្បាស់ជាង។",
+        help="Speed Up & Slow Down ជាជម្រើសធម្មជាតិជាងសម្រាប់ timing មិនស្មើគ្នា។ Speed Up Only អាចធ្វើឲ្យសំឡេងលឿនពេកនៅពេល subtitle ខ្លី។",
     )
 
     st.divider()
@@ -4190,7 +4194,7 @@ with tab_video:
     uploaded_video = st.file_uploader(
         "Upload Video",
         type=["mp4", "mov", "mkv", "webm"],
-        help="MP4 ត្រូវបានណែនាំ។ App នឹងបង្រួមវីដេអូទៅ 480p ដោយស្វ័យប្រវត្តិ ដើម្បីកាត់បន្ថយ RAM និងល្បឿនដំណើរការ។",
+        help="MP4 ត្រូវបានណែនាំ។ វីដេអូអាចមានរយៈពេលដល់ 15 នាទី។ 5.5 វិនាទីគឺសម្រាប់បែងចែក subtitle cue មួយប៉ុណ្ណោះ មិនមែនជាកំណត់វីដេអូទេ។ App នឹងបង្រួមវីដេអូទៅ 480p ដោយស្វ័យប្រវត្តិ ដើម្បីកាត់បន្ថយ RAM និងល្បឿនដំណើរការ។",
         key=f"main_video_upload_{st.session_state.video_uploader_version}",
     )
 

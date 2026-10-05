@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.3 — PyAV compatibility fix
+
+Pins PyAV to the compatible `<19` range for `faster-whisper==1.2.1`. PyAV 19 removed the `metadata_errors` argument used by the decoder, which caused video transcription to fail before Gemini translation or audio generation began.
+
 ## v6.5.2 — Complete Gemini 2.5–3.8 translation model catalog
 
 This patch exposes the full supported text-translation catalog to every signed-in user: Gemini 2.5 Flash, 2.5 Flash-Lite, 2.5 Pro, Gemini 3 Flash Preview, 3.1 Flash-Lite, 3.1 Pro Preview, 3.5 Flash, 3.5 Flash-Lite, 3.6 Flash, 3.7 Flash, and 3.8 Flash. Live voice and TTS-only endpoints are intentionally excluded from the text translator.
