@@ -1,8 +1,8 @@
-# AI KHEMRA BRO v6.5.2
+# AI KHEMRA BRO v6.5.5
 
 AI KHEMRA BRO is a Streamlit application for the **Video → Whisper → Khmer SRT → MP3** workflow. It uses Gemini for translation and subtitle generation, faster-whisper for transcription, FFmpeg for media processing, and Edge TTS for Khmer voice output.
 
-> **Version note:** This README documents the v6.5.2 complete Gemini 2.5–3.8 translation model catalog patch. Runtime dependency pins remain unchanged from the verified v6.5 baseline; validate the tagged commit before any production deployment.
+> **Version note:** This README documents the v6.5.5 release, including the complete Gemini 2.5–3.8 translation catalog, PyAV compatibility fix, always-visible video preview, and simplified SRT editor controls.
 
 ## Runtime highlights
 
