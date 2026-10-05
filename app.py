@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.3"
+APP_VERSION = "6.5.4"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -4213,8 +4213,8 @@ with tab_video:
         if size_mb > max_mb:
             st.error(f"សូមបង្រួមវីដេអូឱ្យតិចជាង {max_mb} MB។")
         else:
-            if not lite_mode and st.checkbox("▶️ Video Preview"):
-                st.video(uploaded_video)
+            # Always show the uploaded video; preview is no longer optional.
+            st.video(uploaded_video)
 
             if st.button("📝 Generate Khmer SRT", key="generate_srt", use_container_width=True):
                 video_path = save_upload(uploaded_video)

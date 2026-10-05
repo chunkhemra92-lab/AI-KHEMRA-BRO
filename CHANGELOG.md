@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.4 — Always-visible video preview
+
+Removes the optional **Video Preview** checkbox. Uploaded videos now display automatically in the Video → SRT workflow whenever the upload is valid.
+
 ## v6.5.3 — PyAV compatibility fix
 
 Pins PyAV to the compatible `<19` range for `faster-whisper==1.2.1`. PyAV 19 removed the `metadata_errors` argument used by the decoder, which caused video transcription to fail before Gemini translation or audio generation began.
