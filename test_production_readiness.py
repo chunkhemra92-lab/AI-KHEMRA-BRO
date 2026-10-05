@@ -11,6 +11,8 @@ assert 'FFMPEG_FINAL_MIX_TIMEOUT_SECONDS = 900' in SOURCE
 assert "av>=11,<19" in REQUIREMENTS, "PyAV must stay compatible with faster-whisper metadata_errors usage"
 assert 'st.video(uploaded_video)' in SOURCE
 assert 'st.checkbox("▶️ Video Preview")' not in SOURCE
+assert 'key="validate_main_srt"' not in SOURCE
+assert 'key="restore_source_srt"' not in SOURCE
 assert 'sqlite3.connect(str(LICENSE_DB_PATH), timeout=30)' in SOURCE
 assert 'PRAGMA journal_mode=WAL' in SOURCE
 assert 'PRAGMA busy_timeout=30000' in SOURCE

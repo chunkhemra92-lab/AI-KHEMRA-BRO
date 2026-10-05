@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.5 — Simplified SRT editor controls
+
+Removes the **ពិនិត្យ SRT** validation button and **ស្តារវិញ** restore button from the editor toolbar while keeping the SRT editor and remaining generation/download workflow intact.
+
 ## v6.5.4 — Always-visible video preview
 
 Removes the optional **Video Preview** checkbox. Uploaded videos now display automatically in the Video → SRT workflow whenever the upload is valid.

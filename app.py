@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.4"
+APP_VERSION = "6.5.5"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -4324,27 +4324,7 @@ with tab_video:
     )
     st.session_state.srt_text = st.session_state.main_srt_editor
 
-    with st.container(key="srt_editor_toolbar"):
-        editor_col1, editor_col2, editor_col3 = st.columns([1.1, 1.1, 1.4], gap="small")
-        with editor_col1:
-            if st.button("✅ ពិនិត្យ SRT", key="validate_main_srt", use_container_width=True):
-                parsed_editor_cues = parse_srt(st.session_state.srt_text)
-                if parsed_editor_cues:
-                    st.success(f"✅ SRT ត្រឹមត្រូវ · {len(parsed_editor_cues)} បន្ទាត់")
-                else:
-                    st.error("❌ មិនឃើញ timestamp ឬអត្ថបទត្រឹមត្រូវទេ។")
-        with editor_col2:
-            if st.button("↩️ ស្តារវិញ", key="restore_source_srt", use_container_width=True):
-                restored_srt = st.session_state.get("source_srt_text", "")
-                st.session_state.main_srt_editor = restored_srt
-                st.session_state.srt_text = restored_srt
-                st.session_state.audio_bytes = None
-                st.rerun()
-        with editor_col3:
-            editor_cue_count = len(parse_srt(st.session_state.srt_text)) if st.session_state.srt_text.strip() else 0
-            st.caption(f"{editor_cue_count} cues · ការកែប្រែរក្សាទុកក្នុង project នេះ")
-
-    # Keep both SRT action buttons on one row directly below the editor,
+    # Keep the remaining SRT action buttons on one row directly below the editor,
     # including portrait and landscape mobile screens.
     with st.container(key="srt_actions"):
         c1, c2 = st.columns([1, 1], gap=None)
