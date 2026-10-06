@@ -2,7 +2,7 @@
 
 ## v6.5.5 — Simplified SRT editor controls
 
-Removes the **ពិនិត្យ SRT** validation button and **ស្តារវិញ** restore button from the editor toolbar while keeping the SRT editor and remaining generation/download workflow intact.
+Removes the **ពិនិត្យ SRT** validation button and **ស្តារវិញ** restore button from the editor toolbar while keeping the SRT editor and remaining generation/download workflow intact. Restores the earlier customer sign-in appearance with the branded hero card and original login layout.
 
 ## v6.5.4 — Always-visible video preview
 

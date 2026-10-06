@@ -708,177 +708,6 @@ body:has(.theme-mode-light) .st-key-settings_drawer input,body:has(.theme-mode-l
 body:has(.theme-mode-light) .settings-profile-card{background:#effaff!important;border-color:#38bdf8!important;color:#172033!important}
 body:has(.theme-mode-light) .settings-profile-name,body:has(.theme-mode-light) .settings-profile-detail,body:has(.theme-mode-light) .settings-profile-days{color:#172033!important}
 body:has(.theme-mode-light) .stAlert{background:#ffffff!important;color:#172033!important}
-
-
-/* Customer login: calm, compact hierarchy with one restrained accent. */
-.st-key-public_login_wrap{
-  width:min(100%,460px)!important;
-  margin:0 auto!important;
-  padding:0 18px 28px!important;
-}
-.login-brand-header{
-  margin:4px auto 20px!important;
-  text-align:center!important;
-}
-.login-brand-mark{
-  display:grid!important;
-  width:48px!important;
-  height:48px!important;
-  margin:0 auto 14px!important;
-  place-items:center!important;
-  border:1px solid #334967!important;
-  border-radius:14px!important;
-  background:#172438!important;
-  color:#9ac8fa!important;
-  font-size:16px!important;
-  font-weight:850!important;
-  letter-spacing:-.6px!important;
-}
-.login-brand-header h1{
-  margin:0!important;
-  color:#f5f7fb!important;
-  font-size:clamp(23px,6vw,28px)!important;
-  font-weight:850!important;
-  letter-spacing:-.65px!important;
-  line-height:1.2!important;
-}
-.login-brand-tagline{
-  margin:7px 0 0!important;
-  color:#8493a8!important;
-  font-size:10px!important;
-  font-weight:750!important;
-  letter-spacing:1.3px!important;
-}
-.login-brand-khmer{
-  margin:11px 0 0!important;
-  color:#b2bece!important;
-  font-family:"Noto Sans Khmer","Khmer OS System",Arial,sans-serif!important;
-  font-size:14px!important;
-  font-weight:500!important;
-  line-height:1.6!important;
-}
-.login-form-title{
-  margin:0!important;
-  color:#f5f7fb!important;
-  background:none!important;
-  -webkit-background-clip:border-box!important;
-  -webkit-text-fill-color:#f5f7fb!important;
-  text-shadow:none!important;
-  font-size:22px!important;
-  font-weight:750!important;
-  letter-spacing:-.4px!important;
-  line-height:1.25!important;
-}
-.login-form-intro{
-  margin:6px 0 16px!important;
-  color:#94a1b4!important;
-  font-size:13px!important;
-  line-height:1.5!important;
-}
-.st-key-customer_login_box{
-  padding:23px 22px 21px!important;
-  border:1px solid #26364c!important;
-  border-radius:17px!important;
-  background:#111a28!important;
-  box-shadow:0 16px 40px rgba(0,0,0,.18)!important;
-}
-.st-key-customer_login_box label,
-.st-key-customer_login_box label p{
-  color:#c6d0de!important;
-  font-family:"Noto Sans Khmer","Khmer OS System",Arial,sans-serif!important;
-  font-size:13px!important;
-  font-weight:650!important;
-}
-.st-key-customer_login_box input{
-  min-height:47px!important;
-  padding:0 13px!important;
-  border:1px solid #35445a!important;
-  border-radius:9px!important;
-  background:#0c1420!important;
-  box-shadow:none!important;
-  color:#f2f5fa!important;
-  font-size:15px!important;
-}
-.st-key-customer_login_box input::placeholder{
-  color:#718096!important;
-  opacity:1!important;
-}
-.st-key-customer_login_box input:focus{
-  border-color:#6696d5!important;
-  box-shadow:0 0 0 3px rgba(102,150,213,.15)!important;
-}
-.st-key-customer_login_box [data-testid="stFormSubmitButton"],
-.st-key-customer_login_box [data-testid="stFormSubmitButton"] > div,
-.st-key-customer_login_box [data-testid="stFormSubmitButton"] button{
-  width:100%!important;
-  max-width:100%!important;
-  box-sizing:border-box!important;
-  min-height:48px!important;
-  margin-top:8px!important;
-  border:1px solid #5b8fd4!important;
-  border-radius:9px!important;
-  background:#3979c4!important;
-  box-shadow:none!important;
-  color:#fff!important;
-  font-family:"Noto Sans Khmer","Khmer OS System",Arial,sans-serif!important;
-  font-size:15px!important;
-  font-weight:750!important;
-  text-shadow:none!important;
-  transition:background .15s ease,transform .15s ease!important;
-}
-.st-key-customer_login_box [data-testid="stFormSubmitButton"] button:hover{
-  transform:translateY(-1px)!important;
-  background:#4488d7!important;
-  box-shadow:0 7px 16px rgba(42,103,177,.18)!important;
-}
-.st-key-customer_login_box [data-testid="stFormSubmitButton"] button p{
-  color:#fff!important;
-  font-weight:750!important;
-}
-.login-footer{
-  padding:16px 4px 0!important;
-  text-align:center!important;
-}
-.login-help{
-  margin:0!important;
-  color:#97a4b6!important;
-  font-family:"Noto Sans Khmer","Khmer OS System",Arial,sans-serif!important;
-  font-size:12px!important;
-  line-height:1.6!important;
-}
-.login-help strong{color:#d7e3f3!important}
-.login-social-links{
-  display:flex!important;
-  justify-content:center!important;
-  gap:18px!important;
-  margin:12px 0 0!important;
-}
-.login-social-links a{
-  color:#8fb9e8!important;
-  font-size:12px!important;
-  font-weight:750!important;
-  text-decoration:none!important;
-}
-.login-social-links a:hover{
-  color:#c0ddff!important;
-  text-decoration:underline!important;
-}
-.login-security-note{
-  margin:13px 0 0!important;
-  color:#718096!important;
-  font-family:"Noto Sans Khmer","Khmer OS System",Arial,sans-serif!important;
-  font-size:11px!important;
-  font-weight:550!important;
-}
-.login-security-note span{color:#8fb9e8!important}
-@media(max-width:520px){
-  .st-key-public_login_wrap{padding:0 16px 22px!important}
-  .login-brand-header{margin:0 auto 18px!important}
-  .st-key-customer_login_box{padding:21px 18px 19px!important}
-}
-@media(prefers-reduced-motion:reduce){
-  .st-key-customer_login_box [data-testid="stFormSubmitButton"] button{transition:none!important}
-}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -3722,21 +3551,33 @@ def public_login_screen():
     with st.container(key="public_login_wrap"):
         st.markdown(
             """
-            <header class="login-brand-header">
-              <div class="login-brand-mark" aria-label="AI Khemra Bro brand mark">AI</div>
+            <section class="login-hero-card">
+              <div class="login-brand-orb" aria-label="AI KHEMRA BRO brand mark">
+                <span class="login-brand-orb-core">AI</span>
+                <span class="login-brand-orb-name">KHEMRA <b>BRO</b></span>
+              </div>
               <h1>AI KHEMRA BRO</h1>
-              <p class="login-brand-tagline">GLOBAL AI DUBBING WORKSTATION</p>
-              <p class="login-brand-khmer">ដំណោះស្រាយបកប្រែ និងសំឡេងខ្មែរសម្រាប់អ្នក</p>
-            </header>
+              <p class="login-tagline">GLOBAL AI DUBBING WORKSTATION</p>
+              <p class="login-khmer">ដំណោះស្រាយបកប្រែ និងសំឡេងខ្មែរសម្រាប់អ្នក</p>
+              <div class="social-split">
+                <a href="https://www.facebook.com/Khrmra?mibextid=wwXIfr&mibextid=wwXIfr" target="_blank" rel="noopener noreferrer"
+                   aria-label="Open KHEMRA Facebook">
+                  <span class="social-icon">f</span>
+                  <span>Facebook</span>
+                </a>
+                <a href="https://t.me/+VC_6B66uwH5hMDE9" target="_blank" rel="noopener noreferrer"
+                   aria-label="Open KHEMRA Telegram">
+                  <span class="social-icon">➤</span>
+                  <span>Telegram</span>
+                </a>
+              </div>
+            </section>
             """,
             unsafe_allow_html=True,
         )
+        st.markdown('<div class="login-section-heading"><span></span><h2 class="login-form-title">LOGIN</h2><span></span></div>', unsafe_allow_html=True)
+
         with st.container(key="customer_login_box"):
-            st.markdown(
-                '<h2 class="login-form-title">Sign in</h2>'
-                '<p class="login-form-intro">Access your dubbing workspace.</p>',
-                unsafe_allow_html=True,
-            )
             with st.form("customer_login_form", clear_on_submit=False):
                 name = st.text_input(
                     "ឈ្មោះ៖ (មិនចាំបាច់បញ្ចូលក៏បាន)",
@@ -3747,10 +3588,7 @@ def public_login_screen():
                     placeholder="KHBR-XXXX-XXXX",
                     type="password",
                 )
-                submitted = st.form_submit_button(
-                    "ចូលប្រើកម្មវិធី",
-                    use_container_width=True,
-                )
+                submitted = st.form_submit_button("ចូលប្រើកម្មវិធី")
 
         if submitted:
             existing = _session_cookie_get()
@@ -3773,14 +3611,11 @@ def public_login_screen():
 
         st.markdown(
             """
-            <footer class="login-footer">
-              <div class="login-help">សូមទាក់ទង Owner ដើម្បីទទួល <strong>Access Code</strong></div>
-              <nav class="login-social-links" aria-label="Social links">
-                <a href="https://www.facebook.com/Khrmra" target="_blank" rel="noopener noreferrer">Facebook</a>
-                <a href="https://t.me/+VC_6B66uwH5hMDE9" target="_blank" rel="noopener noreferrer">Telegram</a>
-              </nav>
-              <div class="login-security-note"><span>●</span> ការពារសុវត្ថិភាព&nbsp;&nbsp;·&nbsp;&nbsp;ទិន្នន័យរបស់អ្នកត្រូវបានការពារ</div>
-            </footer>
+            <div class="login-help-row">
+              <div class="login-help">សូមទាក់ទង Owner ដើម្បីទទួល <strong>Access Code</strong> សម្រាប់ចូលប្រើកម្មវិធី។</div>
+              <div class="login-security-note"><span>◈</span> ការពារសុវត្ថិភាព&nbsp;&nbsp;|&nbsp;&nbsp;ទិន្នន័យការពារ</div>
+            </div>
+            <div class="login-orb-footer" aria-hidden="true">AI</div>
             """,
             unsafe_allow_html=True,
         )
