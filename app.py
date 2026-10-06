@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.5"
+APP_VERSION = "6.5.6"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -714,18 +714,18 @@ body:has(.theme-mode-light) .stAlert{background:#ffffff!important;color:#172033!
 PISITH='km-KH-PisethNeural'
 SREYMOM='km-KH-SreymomNeural'
 VOICE_PROFILES={
-# Warm, natural profiles. Large pitch boosts make Khmer Neural voices thin/airy,
-# so age differences use mostly rate and only a very small pitch movement.
-'BOY':{'voice':PISITH,'rate':'+4%','pitch':'+2Hz','volume':'+5%'},
-'GIRL':{'voice':SREYMOM,'rate':'+4%','pitch':'+3Hz','volume':'+5%'},
-'M_YOUNG':{'voice':PISITH,'rate':'+1%','pitch':'+0Hz','volume':'+6%'},
-'F_YOUNG':{'voice':SREYMOM,'rate':'+1%','pitch':'+1Hz','volume':'+6%'},
-'M_ADULT':{'voice':PISITH,'rate':'-2%','pitch':'-1Hz','volume':'+1%'},
-'F_ADULT':{'voice':SREYMOM,'rate':'-2%','pitch':'+1Hz','volume':'+1%'},
-'M_OLD':{'voice':PISITH,'rate':'-11%','pitch':'-8Hz','volume':'+8%'},
-'F_OLD':{'voice':SREYMOM,'rate':'-10%','pitch':'-6Hz','volume':'+8%'},
-'M_THINK':{'voice':PISITH,'rate':'-4%','pitch':'-2Hz','volume':'-1%'},
-'F_THINK':{'voice':SREYMOM,'rate':'-4%','pitch':'-1Hz','volume':'-1%'},
+# Keep Edge Neural voices close to their native Khmer prosody. Large rate or
+# pitch offsets sound synthetic, especially on short subtitle cues.
+'BOY':{'voice':PISITH,'rate':'+2%','pitch':'+1Hz','volume':'+2%'},
+'GIRL':{'voice':SREYMOM,'rate':'+2%','pitch':'+1Hz','volume':'+2%'},
+'M_YOUNG':{'voice':PISITH,'rate':'+1%','pitch':'+0Hz','volume':'+1%'},
+'F_YOUNG':{'voice':SREYMOM,'rate':'+1%','pitch':'+0Hz','volume':'+1%'},
+'M_ADULT':{'voice':PISITH,'rate':'+0%','pitch':'+0Hz','volume':'+0%'},
+'F_ADULT':{'voice':SREYMOM,'rate':'+0%','pitch':'+0Hz','volume':'+0%'},
+'M_OLD':{'voice':PISITH,'rate':'-5%','pitch':'-2Hz','volume':'+2%'},
+'F_OLD':{'voice':SREYMOM,'rate':'-5%','pitch':'-2Hz','volume':'+2%'},
+'M_THINK':{'voice':PISITH,'rate':'-2%','pitch':'-1Hz','volume':'-1%'},
+'F_THINK':{'voice':SREYMOM,'rate':'-2%','pitch':'-1Hz','volume':'-1%'},
 'NARRATOR_M':{'voice':PISITH,'rate':'-7%','pitch':'-6Hz','volume':'+8%'},
 'NARRATOR_F':{'voice':SREYMOM,'rate':'-6%','pitch':'-4Hz','volume':'+8%'},
 # Backward-compatible labels for older SRT files.
@@ -783,13 +783,15 @@ VOICE_FADE_IN_SECONDS = 0.045
 VOICE_FADE_OUT_SECONDS = 0.070
 # Consistent dialogue targets prevent audible level jumps when the four roles alternate.
 VOICE_CLIP_TARGET_LUFS = -20
-VOICE_THOUGHT_RELATIVE_GAIN_DB = -1.5
+VOICE_THOUGHT_RELATIVE_GAIN_DB = -1.0
 FINAL_MASTER_TARGET_LUFS = -16
 FINAL_MASTER_TRUE_PEAK_DB = -1.5
 MIN_VOICE_GAP_MS = 12
 # Keep timing correction within a more natural speech range. Larger changes
 # make Khmer neural voices sound rushed or metallic, especially on short cues.
-MAX_TEMPO_SPEED = 1.35
+# Avoid the unnatural, rushed sound produced by aggressive cue fitting.
+MAX_TEMPO_SPEED = 1.18
+MIN_TEMPO_SPEED = 0.86
 # Bounded service calls keep one temporary provider failure from blocking an entire project.
 EDGE_TTS_REQUEST_TIMEOUT_SECONDS = 75
 EDGE_TTS_MAX_CONCURRENT_REQUESTS = 2
@@ -2596,9 +2598,9 @@ def character_voice_filters(tag):
         # Natural dialogue: restrained low-body support and a controlled presence band.
         'M': ['equalizer=f=180:t=q:w=1.0:g=0.9', 'equalizer=f=3200:t=q:w=1.0:g=-0.8'],
         'F': ['equalizer=f=210:t=q:w=1.0:g=0.5', 'equalizer=f=3200:t=q:w=1.0:g=-1.1'],
-        # Inner thoughts: darker, gentler, and less sharp before the subtle dream treatment.
-        'M_THINK': ['equalizer=f=200:t=q:w=1.0:g=0.6', 'equalizer=f=3000:t=q:w=1.0:g=-1.4'],
-        'F_THINK': ['equalizer=f=230:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-1.6'],
+        # Inner thoughts: slightly darker and quieter, but still dry and centered.
+        'M_THINK': ['equalizer=f=200:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-1.0'],
+        'F_THINK': ['equalizer=f=230:t=q:w=1.0:g=0.3', 'equalizer=f=3000:t=q:w=1.0:g=-1.1'],
     }
     return mapping.get(lock_voice_tag(tag), [])
 
@@ -2623,9 +2625,7 @@ def polish_tts_output(source_path, output_path, voice_tag):
             'lowpass=f=6800:p=2',
             'equalizer=f=3400:t=q:w=1.0:g=-1.8',
             'equalizer=f=4800:t=q:w=1.1:g=-1.4',
-            'aecho=0.8:0.78:110:0.18',
             'pan=stereo|c0=c0|c1=c0',
-            'haas=left_delay=1.2:right_delay=1.8:side_gain=0.06',
             *character_voice_filters(voice_tag),
         ]
     filters.extend([
@@ -2795,7 +2795,7 @@ def create_mp3(
             # preserved by the final amix instead of being trimmed at next start.
             required_speed = audio_seconds / slot_seconds
             if audio_sync_mode == "Speed Up & Slow Down":
-                safe_speed = min(max(0.75, required_speed), MAX_TEMPO_SPEED)
+                safe_speed = min(max(MIN_TEMPO_SPEED, required_speed), MAX_TEMPO_SPEED)
             else:
                 safe_speed = min(max(1.0, required_speed), MAX_TEMPO_SPEED)
             tempo = atempo_chain(safe_speed) if abs(safe_speed - 1.0) > 0.001 else ''
@@ -2816,15 +2816,12 @@ def create_mp3(
             if is_thought:
                 # Track 2: close, natural inner monologue with a restrained short reflection.
                 parts.extend([
-                    # Natural inner voice: close and human, with a very short,
-                    # low-level reflection and subtle binaural width—never a hall tail.
+                    # Natural inner voice: close, dry, centered, and only slightly darker.
                     'highpass=f=150:p=2',
-                    'lowpass=f=9800:p=2',
-                    'equalizer=f=4300:t=q:w=1.1:g=-1.2',
-                    'equalizer=f=6500:t=q:w=1.0:g=-1.0',
-                    'aecho=0.8:0.78:110:0.18',
+                    'lowpass=f=8200:p=2',
+                    'equalizer=f=4300:t=q:w=1.1:g=-0.8',
+                    'equalizer=f=6500:t=q:w=1.0:g=-0.7',
                     'pan=stereo|c0=c0|c1=c0',
-                    'haas=left_delay=1.2:right_delay=1.8:side_gain=0.06',
                 ])
             else:
                 # Track 1: dry, centered dialogue with a strict anti-boxiness cut.

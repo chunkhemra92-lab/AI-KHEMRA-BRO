@@ -12,7 +12,7 @@ REQUIRED = {"_voice_tag_key", "compact_voice_tag", "lock_voice_tag", "character_
 NODES = [node for node in TREE.body if isinstance(node, ast.FunctionDef) and node.name in REQUIRED]
 namespace = {
     "FFMPEG_CLIP_CONVERSION_TIMEOUT_SECONDS": 180,
-    "VOICE_THOUGHT_RELATIVE_GAIN_DB": -1.5,
+    "VOICE_THOUGHT_RELATIVE_GAIN_DB": -1.0,
     "FINAL_MASTER_TARGET_LUFS": -16,
     "FINAL_MASTER_TRUE_PEAK_DB": -1.5,
     "LOCKED_VOICE_TAGS": frozenset({"M", "F", "M_THINK", "F_THINK"}),

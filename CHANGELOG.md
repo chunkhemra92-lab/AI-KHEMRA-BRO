@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.6 — Natural four-role Khmer voice polish
+
+Tunes the four locked roles—normal male, normal female, male inner thought, and female inner thought—for native Khmer Neural prosody. Removes artificial echo and Haas widening from inner thoughts, keeps speech centered and dry, reduces aggressive pitch/rate offsets, and limits timing correction to a safer 0.86–1.18× range.
+
 ## v6.5.5 — Simplified SRT editor controls
 
 Removes the **ពិនិត្យ SRT** validation button and **ស្តារវិញ** restore button from the editor toolbar while keeping the SRT editor and remaining generation/download workflow intact. Restores the earlier customer sign-in appearance with the branded hero card and original login layout.
