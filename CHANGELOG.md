@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.7 — Clean customer login fields
+
+Refines the customer sign-in form with clear Username and Password / Access Code labels, taller rounded inputs, improved contrast, and mobile-friendly spacing while preserving the existing Access Code authentication logic.
+
 ## v6.5.6 — Natural four-role Khmer voice polish
 
 Tunes the four locked roles—normal male, normal female, male inner thought, and female inner thought—for native Khmer Neural prosody. Removes artificial echo and Haas widening from inner thoughts, keeps speech centered and dry, reduces aggressive pitch/rate offsets, and limits timing correction to a safer 0.86–1.18× range.

@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.6"
+APP_VERSION = "6.5.7"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -675,6 +675,24 @@ body:has(.settings-toggle-state-closed) .st-key-api_key_input_box{display:none!i
   .social-split{gap:10px!important;margin-top:19px!important}
   .social-split a{min-height:54px!important;font-size:14px!important}
   .st-key-customer_login_box{padding:24px 18px 22px!important}
+  .st-key-customer_login_box label,.st-key-customer_login_box label p{font-size:18px!important}
+  .st-key-customer_login_box input{min-height:62px!important;border-radius:22px!important;font-size:17px!important}
+}
+/* v6.5.7: clean, reference-matched customer login fields. */
+.st-key-customer_login_box [data-testid="stTextInput"]{margin-bottom:22px!important}
+.st-key-customer_login_box label,.st-key-customer_login_box label p{
+  color:#8d9bb4!important;font-family:Arial,"Noto Sans Khmer","Khmer OS System",sans-serif!important;
+  font-size:20px!important;font-weight:500!important;letter-spacing:.1px!important;line-height:1.3!important
+}
+.st-key-customer_login_box input{
+  min-height:66px!important;padding:0 18px!important;border:2px solid #8e9cb2!important;border-radius:24px!important;
+  background:#1a263b!important;color:#ffffff!important;font-size:18px!important;line-height:1.2!important;
+  box-shadow:inset 0 0 0 1px rgba(148,163,184,.18)!important
+}
+.st-key-customer_login_box input::placeholder{color:#718096!important;opacity:1!important}
+@media(max-width:700px){
+  .st-key-customer_login_box label,.st-key-customer_login_box label p{font-size:18px!important}
+  .st-key-customer_login_box input{min-height:62px!important;border-radius:22px!important;font-size:17px!important}
 }
 /* Final admin-home cleanup: compact header, focused form, and quiet secondary controls. */
 .admin-clean-title{margin:4px 0 18px!important;padding:0!important}
@@ -3577,11 +3595,11 @@ def public_login_screen():
         with st.container(key="customer_login_box"):
             with st.form("customer_login_form", clear_on_submit=False):
                 name = st.text_input(
-                    "ឈ្មោះ៖ (មិនចាំបាច់បញ្ចូលក៏បាន)",
+                    "Username",
                     placeholder="អាចទុកទេបាន",
                 )
                 code = st.text_input(
-                    "Access Code",
+                    "Password / Access Code",
                     placeholder="KHBR-XXXX-XXXX",
                     type="password",
                 )
