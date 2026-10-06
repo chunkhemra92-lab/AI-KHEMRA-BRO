@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.8 — Empty login placeholders
+
+Removes the Khmer name hint and the `KHBR-XXXX-XXXX` access-code hint from the login inputs so both fields remain visually clean and empty until the user types.
+
 ## v6.5.7 — Clean customer login fields
 
 Refines the customer sign-in form with clear Username and Password / Access Code labels, taller rounded inputs, improved contrast, and mobile-friendly spacing while preserving the existing Access Code authentication logic.

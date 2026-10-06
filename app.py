@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.7"
+APP_VERSION = "6.5.8"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -3596,11 +3596,11 @@ def public_login_screen():
             with st.form("customer_login_form", clear_on_submit=False):
                 name = st.text_input(
                     "Username",
-                    placeholder="អាចទុកទេបាន",
+                    placeholder="",
                 )
                 code = st.text_input(
                     "Password / Access Code",
-                    placeholder="KHBR-XXXX-XXXX",
+                    placeholder="",
                     type="password",
                 )
                 submitted = st.form_submit_button("ចូលប្រើកម្មវិធី")
