@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.9 — One-year Access Code retention
+
+Keeps the newly generated customer Access Code card available for 365 days instead of 24 hours. The actual license expiry still follows the duration selected by the Owner, including the 1-year option.
+
 ## v6.5.8 — Empty login placeholders
 
 Removes the Khmer name hint and the `KHBR-XXXX-XXXX` access-code hint from the login inputs so both fields remain visually clean and empty until the user types.

@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.8"
+APP_VERSION = "6.5.9"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -2966,7 +2966,11 @@ LOGIN_COOKIE_NAME = "ai_khemra_bro_saved_login"
 SESSION_IDLE_MINUTES = 30
 LOGIN_WINDOW_MINUTES = 5
 MAX_LOGIN_ATTEMPTS = 5
-NEW_LICENSE_CARD_HOURS = 24
+# Keep the generated-code card available for the full one-year customer term.
+# The license expiry itself remains controlled by the selected duration in
+# add_license(); this only prevents the newly-created code card from vanishing
+# after 24 hours.
+NEW_LICENSE_CARD_HOURS = 365 * 24
 
 
 def _utcnow():
