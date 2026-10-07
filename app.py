@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.9"
+APP_VERSION = "6.5.10"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -2966,11 +2966,6 @@ LOGIN_COOKIE_NAME = "ai_khemra_bro_saved_login"
 SESSION_IDLE_MINUTES = 30
 LOGIN_WINDOW_MINUTES = 5
 MAX_LOGIN_ATTEMPTS = 5
-# Keep the generated-code card available for the full one-year customer term.
-# The license expiry itself remains controlled by the selected duration in
-# add_license(); this only prevents the newly-created code card from vanishing
-# after 24 hours.
-NEW_LICENSE_CARD_HOURS = 365 * 24
 
 
 def _utcnow():
@@ -3185,7 +3180,9 @@ def add_license(customer_name, access_code, duration_days, plan_label=""):
     plan = str(plan_label or allowed_plans[days]).strip()
     now = _utcnow()
     expires = now + datetime.timedelta(days=days)
-    card_until = now + datetime.timedelta(hours=NEW_LICENSE_CARD_HOURS)
+    # The share card follows the exact purchased term: it must not outlive
+    # the Access Code itself, whether the owner selected 7 days or 1 year.
+    card_until = expires
     code = validate_manual_access_code(access_code)
 
     with license_connection() as connection:
@@ -3313,6 +3310,11 @@ def validate_customer_login(customer_name, access_code, existing_token="", acqui
             failure_reason = "លេខកូដនេះត្រូវបាន Owner បិទ។"
         elif now >= _parse_iso(row["expires_at"]):
             failure_reason = "កញ្ចប់របស់អ្នកបានផុតកំណត់។ សូមទាក់ទង Owner ដើម្បីបន្តសិទ្ធិប្រើប្រាស់។"
+            connection.execute(
+                "UPDATE licenses SET is_active=0, active_session_hash=NULL, active_session_last_seen=NULL WHERE id=?",
+                (row["id"],),
+            )
+            connection.commit()
         else:
             # No device lock and no single-session lock. A purchased code can
             # be reused after logout/close and can work on any phone/browser.

@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.10 — Exact-term Access Code expiry
+
+The generated Code card now expires exactly with the selected license term. When an Access Code reaches `expires_at`, login is rejected and the license is automatically disabled; the Owner must renew it or issue a new Code.
+
 ## v6.5.9 — One-year Access Code retention
 
 Keeps the newly generated customer Access Code card available for 365 days instead of 24 hours. The actual license expiry still follows the duration selected by the Owner, including the 1-year option.
