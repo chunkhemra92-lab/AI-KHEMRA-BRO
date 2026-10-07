@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.5.11 — Simplified speech settings
+
+Removes the confusing Speech Provider dropdown from Settings. The customer workflow now uses the single built-in Edge TTS route with the four locked Khmer voice roles; the backend compatibility functions remain private and are not exposed as user choices.
+
 ## Isolated Smooth Khmer TTS Server package
 
 Adds a separate `tts-server/` FastAPI service using the four locked Khmer Neural voice roles, conservative clarity processing, `-16 LUFS` loudness normalization, no echo/stereo widening, retries, and parallel cue rendering. Streamlit remains unchanged until the service is deployed and verified.

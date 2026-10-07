@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.10"
+APP_VERSION = "6.5.11"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -3973,32 +3973,6 @@ with st.container(key="settings_drawer"):
         help="Auto ប្រើស្លាកតួអង្គ។ All Male និង All Female បង្ខំសំឡេងតែមួយសម្រាប់គ្រប់បន្ទាត់។",
     )
 
-    st.markdown('<h3 class="settings-drawer-section">🎚️ Speech Provider</h3>', unsafe_allow_html=True)
-    st.selectbox(
-        "ជ្រើស provider សម្រាប់បង្កើតសំឡេង៖",
-        SPEECH_PROVIDER_OPTIONS,
-        key="speech_provider",
-        on_change=account_settings_changed,
-        format_func=lambda value: {
-            "Edge TTS": "⚡ Edge TTS · Built-in fallback",
-            "Google Cloud": "☁️ Google Cloud · Premium Khmer route",
-            "ElevenLabs": "✨ ElevenLabs · Premium neural route",
-        }[value],
-    )
-    selected_speech_provider = st.session_state.speech_provider
-    if selected_speech_provider == "Google Cloud":
-        if _secret("GOOGLE_CLOUD_TTS_SERVICE_ACCOUNT_JSON"):
-            st.success("✅ Google Cloud ready · fallback to Edge TTS is enabled")
-        else:
-            st.warning("⚠️ Google Cloud credentials are not configured; generation will safely fall back to Edge TTS.")
-    elif selected_speech_provider == "ElevenLabs":
-        if _secret("ELEVENLABS_API_KEY") and _secret("ELEVENLABS_VOICE_ID"):
-            st.success("✅ ElevenLabs ready · fallback to Edge TTS is enabled")
-        else:
-            st.warning("⚠️ ElevenLabs API Key/Voice ID are not configured; generation will safely fall back to Edge TTS.")
-    else:
-        st.caption("Edge TTS remains the no-key fallback, so switching providers never blocks the project.")
-
     st.divider()
     st.markdown('<h3 class="settings-drawer-section">🧠 AI Model (ជ្រើស AI)</h3>', unsafe_allow_html=True)
     if st.session_state.translation_provider == "Gemini":
@@ -4024,7 +3998,7 @@ translation_provider = st.session_state.translation_provider
 google_translate_api_key = st.session_state.get("google_translate_api_key", "").strip()
 audio_sync_mode = st.session_state.audio_sync_mode
 voice_mode = st.session_state.voice_mode
-speech_provider = st.session_state.speech_provider
+speech_provider = "Edge TTS"
 model = st.session_state.model_selector
 lite_mode = False
 st.session_state.lite_mode = False
