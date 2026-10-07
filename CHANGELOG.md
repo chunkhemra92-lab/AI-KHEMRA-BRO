@@ -1,5 +1,9 @@
 # Changelog
 
+## Isolated Translation Server package
+
+Adds a separate `translation-server/` FastAPI service that batches up to 60 subtitle cues and processes up to 3 Gemini requests concurrently with retry handling. Streamlit remains unchanged until the service is deployed and verified.
+
 ## Isolated License Server package
 
 Adds a standalone `license-server/` FastAPI service with its own persistent SQLite volume and protected endpoints for Access Code creation, validation, renewal, listing, and revocation. The Streamlit app is intentionally unchanged until the service is deployed and its API URL and service key are configured.

@@ -1,0 +1,19 @@
+services:
+  translation-server:
+    build: .
+    image: ai-khemra-translation:latest
+    restart: unless-stopped
+    environment:
+      TRANSLATION_API_KEY: ${TRANSLATION_API_KEY:?set TRANSLATION_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY}
+      TRANSLATION_MODEL: ${TRANSLATION_MODEL:-gemini-3.8-flash}
+      TRANSLATION_MAX_WORKERS: ${TRANSLATION_MAX_WORKERS:-3}
+      TRANSLATION_BATCH_SIZE: ${TRANSLATION_BATCH_SIZE:-60}
+    ports:
+      - "127.0.0.1:8090:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
