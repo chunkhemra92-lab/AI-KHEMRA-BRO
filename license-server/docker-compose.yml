@@ -1,0 +1,22 @@
+services:
+  license-server:
+    build: .
+    image: ai-khemra-license:latest
+    restart: unless-stopped
+    environment:
+      LICENSE_DB_PATH: /var/lib/ai-khemra-license/licenses.db
+      LICENSE_PEPPER: ${LICENSE_PEPPER:?set LICENSE_PEPPER}
+      LICENSE_ADMIN_KEY: ${LICENSE_ADMIN_KEY:?set LICENSE_ADMIN_KEY}
+      LICENSE_SERVICE_KEY: ${LICENSE_SERVICE_KEY:?set LICENSE_SERVICE_KEY}
+    volumes:
+      - ai_khemra_license_data:/var/lib/ai-khemra-license
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  ai_khemra_license_data:

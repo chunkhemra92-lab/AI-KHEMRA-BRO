@@ -1,5 +1,9 @@
 # Changelog
 
+## Isolated License Server package
+
+Adds a standalone `license-server/` FastAPI service with its own persistent SQLite volume and protected endpoints for Access Code creation, validation, renewal, listing, and revocation. The Streamlit app is intentionally unchanged until the service is deployed and its API URL and service key are configured.
+
 ## v6.5.10 — Exact-term Access Code expiry
 
 The generated Code card now expires exactly with the selected license term. When an Access Code reaches `expires_at`, login is rejected and the license is automatically disabled; the Owner must renew it or issue a new Code.
