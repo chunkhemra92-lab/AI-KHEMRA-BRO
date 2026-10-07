@@ -1,0 +1,17 @@
+services:
+  tts-server:
+    build: .
+    image: ai-khemra-tts:latest
+    restart: unless-stopped
+    environment:
+      TTS_API_KEY: ${TTS_API_KEY:?set TTS_API_KEY}
+      TTS_MAX_WORKERS: ${TTS_MAX_WORKERS:-4}
+      TTS_REQUEST_TIMEOUT_SECONDS: ${TTS_REQUEST_TIMEOUT_SECONDS:-75}
+    ports:
+      - "127.0.0.1:8091:8091"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

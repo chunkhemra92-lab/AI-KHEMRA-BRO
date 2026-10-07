@@ -1,5 +1,9 @@
 # Changelog
 
+## Isolated Smooth Khmer TTS Server package
+
+Adds a separate `tts-server/` FastAPI service using the four locked Khmer Neural voice roles, conservative clarity processing, `-16 LUFS` loudness normalization, no echo/stereo widening, retries, and parallel cue rendering. Streamlit remains unchanged until the service is deployed and verified.
+
 ## Isolated Translation Server package
 
 Adds a separate `translation-server/` FastAPI service that batches up to 60 subtitle cues and processes up to 3 Gemini requests concurrently with retry handling. Streamlit remains unchanged until the service is deployed and verified.
