@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.12"
+APP_VERSION = "6.5.13"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -3029,6 +3029,65 @@ def owner_secrets_configured():
     )
 
 
+def _license_service_url():
+    return _secret("LICENSE_SERVICE_URL").rstrip("/")
+
+
+def _license_service_request(path, payload, admin=False):
+    """Call the authoritative License Server using its dedicated secret."""
+    base_url = _license_service_url()
+    if not base_url:
+        return None
+    service_key = _secret("LICENSE_ADMIN_KEY" if admin else "LICENSE_SERVICE_KEY")
+    if not service_key:
+        raise RuntimeError("License Server secret មិនទាន់បានកំណត់ក្នុង Streamlit Secrets ទេ។")
+    request = urlrequest.Request(
+        f"{base_url}{path}",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            ("X-License-Admin-Key" if admin else "X-License-Service-Key"): service_key,
+        },
+        method="POST",
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urlerror.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")[-500:]
+        raise RuntimeError(f"License Server error: {detail or exc.reason}") from exc
+    except urlerror.URLError as exc:
+        raise RuntimeError(f"មិនអាចភ្ជាប់ License Server បាន៖ {exc.reason}") from exc
+
+
+def _sync_remote_license_shadow(customer_name, access_code, remote):
+    """Mirror only the validated license metadata for app settings/session use."""
+    code = normalize_access_code(access_code)
+    now = _utcnow()
+    expires_at = str(remote.get("expires_at") or _iso(now))
+    plan = str(remote.get("plan") or "សមាជិក").strip()[:80]
+    name = normalize_customer_name(remote.get("customer_name") or customer_name) or "Customer"
+    with license_connection() as connection:
+        row = connection.execute(
+            "SELECT id FROM licenses WHERE access_code_hash=? OR access_code_display=?",
+            (_hash_code(code), code),
+        ).fetchone()
+        if row:
+            connection.execute(
+                "UPDATE licenses SET customer_name=?, access_code_display=?, expires_at=?, is_active=1, plan_label=?, created_card_until=? WHERE id=?",
+                (name, code, expires_at, plan, expires_at, row["id"]),
+            )
+            license_id = row["id"]
+        else:
+            cursor = connection.execute(
+                "INSERT INTO licenses (customer_name, access_code_hash, access_code_display, created_at, expires_at, is_active, created_card_until, plan_label) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+                (name, _hash_code(code), code, _iso(now), expires_at, expires_at, plan),
+            )
+            license_id = cursor.lastrowid
+        connection.commit()
+        return connection.execute("SELECT * FROM licenses WHERE id=?", (license_id,)).fetchone()
+
+
 def license_connection():
     connection = sqlite3.connect(str(LICENSE_DB_PATH), timeout=30)
     connection.row_factory = sqlite3.Row
@@ -3196,6 +3255,19 @@ def add_license(customer_name, access_code, duration_days, plan_label=""):
         raise ValueError("រយៈពេលមិនត្រឹមត្រូវ។")
 
     plan = str(plan_label or allowed_plans[days]).strip()
+    if _license_service_url():
+        remote = _license_service_request(
+            "/v1/licenses",
+            {"customer_name": name, "duration_days": days, "access_code": access_code or None},
+            admin=True,
+        ) or {}
+        code = normalize_access_code(remote.get("access_code"))
+        if not code or not remote.get("expires_at"):
+            raise RuntimeError("License Server មិនបានត្រឡប់ Access Code និងថ្ងៃផុតកំណត់ត្រឹមត្រូវទេ។")
+        expires = _parse_iso(remote["expires_at"])
+        _sync_remote_license_shadow(name, code, {**remote, "plan": remote.get("plan") or plan})
+        _audit("license_created_remote", get_admin_username(), f"{name}|{plan}|{days} days")
+        return code, expires, expires
     now = _utcnow()
     expires = now + datetime.timedelta(days=days)
     # The share card follows the exact purchased term: it must not outlive
@@ -3315,6 +3387,36 @@ def validate_customer_login(customer_name, access_code, existing_token="", acqui
     failure_reason = ""
     fresh = None
     token = existing_token or secrets.token_urlsafe(32)
+
+    if _license_service_url():
+        try:
+            remote = _license_service_request(
+                "/v1/licenses/validate", {"access_code": code}
+            ) or {}
+        except Exception as exc:
+            if acquire_session:
+                _record_login_attempt(attempt_key, False)
+            return False, f"មិនអាចពិនិត្យ Access Code បាន៖ {exc}", None, ""
+        if not remote.get("valid"):
+            reasons = {
+                "not_found": "លេខកូដមិនត្រឹមត្រូវ។",
+                "revoked": "លេខកូដនេះត្រូវបាន Owner បិទ។",
+                "expired": "កញ្ចប់របស់អ្នកបានផុតកំណត់។ សូមបន្តសិទ្ធិជាមួយ Owner។",
+            }
+            message = reasons.get(str(remote.get("reason")), "លេខកូដមិនអាចប្រើបានទេ។")
+            if acquire_session:
+                _record_login_attempt(attempt_key, False)
+            return False, message, None, ""
+        try:
+            fresh = _sync_remote_license_shadow(entered_name, code, remote)
+        except Exception as exc:
+            if acquire_session:
+                _record_login_attempt(attempt_key, False)
+            return False, f"បានផ្ទៀងផ្ទាត់ Code ប៉ុន្តែ app មិនអាចរក្សាទុក session បាន៖ {exc}", None, ""
+        if acquire_session:
+            _record_login_attempt(attempt_key, True)
+            _audit("customer_login_remote", str(fresh["customer_name"]), "success|license-server")
+        return True, "", dict(fresh), token
 
     with license_connection() as connection:
         row = connection.execute(

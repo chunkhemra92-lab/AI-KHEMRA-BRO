@@ -1,5 +1,12 @@
 # Changelog
 
+## v6.5.13 — Authoritative License Server login routing
+
+- Added optional remote License Server routing for Owner Code creation and customer login validation.
+- When `LICENSE_SERVICE_URL` is configured, the remote License Server is the single source of truth; Streamlit no longer rejects Codes created by that server as “invalid”.
+- Added a small local shadow record after successful validation so account-bound settings and session display continue to work without sharing the License database.
+- Preserved the existing local database fallback when the remote License Server is not configured.
+
 ## v6.5.12 — Natural Khmer audio and translation validation
 
 - Added conservative `dynaudnorm` smoothing on the voice bus, final master, and standalone TTS output to reduce cue-to-cue loudness jumps without removing natural emotion.

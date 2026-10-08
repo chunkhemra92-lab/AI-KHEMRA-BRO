@@ -45,4 +45,12 @@ The generated raw Code is returned only at creation/renewal time. The service sh
 
 ## Integration note
 
-The current Streamlit app remains unchanged and continues using its existing local license database. This isolation prevents the new service from disrupting the live app. The next integration step is to configure Streamlit with `LICENSE_SERVICE_URL` and `LICENSE_SERVICE_KEY`, then switch customer validation and Owner CRUD to these API endpoints after the server is deployed and tested.
+Streamlit v6.5.13 supports this server as the authoritative Code source. Configure these private Streamlit Secrets after the service is deployed:
+
+```toml
+LICENSE_SERVICE_URL = "https://license.example.com"
+LICENSE_SERVICE_KEY = "the-service-key-used-by-the-app"
+LICENSE_ADMIN_KEY = "the-admin-key-used-only-by-owner-code-creation"
+```
+
+With `LICENSE_SERVICE_URL` present, Owner Code creation calls `POST /v1/licenses`, and customer login calls `POST /v1/licenses/validate`. The app keeps only a small local shadow record for the active session and account settings; it does not share or become the source of truth for the License database. Without `LICENSE_SERVICE_URL`, the existing local database fallback remains active.
