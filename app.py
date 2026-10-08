@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.13"
+APP_VERSION = "6.5.14"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -2206,53 +2206,53 @@ def translate_cues_text_only(
     api_keys, model_name, cues, translation_style=DEFAULT_TRANSLATION_STYLE,
     target_language=DEFAULT_TARGET_LANGUAGE,
 ):
-    """Translate in large ordered batches, rotating through every saved Gemini key."""
+    """Translate with bounded parallel batches, then repair only incomplete IDs."""
     if isinstance(api_keys, str):
         api_keys = [api_keys]
     keys = _normalized_api_keys("\n".join(str(key or "") for key in api_keys))
     if not keys:
         raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
+    batch_size = 45
+    batches = [cues[offset:offset + batch_size] for offset in range(0, len(cues), batch_size)]
+
+    def request_with_rotating_keys(request_batch, context="", start_at=0):
+        last_error = None
+        for key_offset in range(len(keys)):
+            api_key_value = keys[(start_at + key_offset) % len(keys)]
+            try:
+                client = genai.Client(api_key=api_key_value)
+                return _translate_batch_text_only(
+                    client, model_name, request_batch, context, translation_style,
+                    target_language,
+                )
+            except Exception as exc:
+                last_error = exc
+                if not (is_quota_error(exc) or is_invalid_key_error(exc)):
+                    raise
+        raise RuntimeError(friendly_ai_error(last_error, len(keys)))
+
+    def translate_batch(batch_number, batch):
+        # Source-only continuity keeps parallel requests independent and avoids
+        # waiting for the previous batch while still giving the model scene context.
+        start = cues.index(batch[0])
+        context_rows = [
+            f'ID={cue["id"]} SOURCE={cue["source"]}'
+            for cue in cues[max(0, start - 6):start]
+        ]
+        return batch_number, batch, request_with_rotating_keys(
+            batch, "\n".join(context_rows), start_at=batch_number
+        )
 
     translated = {}
-    # Fewer requests reduce latency while sequential batches preserve dialogue context.
-    batch_size = 60
-    for batch_number, offset in enumerate(range(0, len(cues), batch_size)):
-        batch = cues[offset:offset + batch_size]
-        context_rows = []
-        for cue in cues[max(0, offset - 6):offset]:
-            item = translated.get(cue["id"])
-            if item:
-                context_rows.append(
-                    f'ID={cue["id"]} TAG={item["tag"]} SOURCE={cue["source"]} KHMER={item["text"]}'
-                )
-
-        def request_with_rotating_keys(request_batch, context="", start_at=None):
-            last_error = None
-            start_index = batch_number % len(keys) if start_at is None else start_at % len(keys)
-            for key_offset in range(len(keys)):
-                api_key_value = keys[(start_index + key_offset) % len(keys)]
-                try:
-                    client = genai.Client(api_key=api_key_value)
-                    return _translate_batch_text_only(
-                        client, model_name, request_batch, context, translation_style,
-                        target_language,
-                    )
-                except Exception as exc:
-                    last_error = exc
-                    if not (is_quota_error(exc) or is_invalid_key_error(exc)):
-                        raise
-            raise RuntimeError(friendly_ai_error(last_error, len(keys)))
-
-        parsed = request_with_rotating_keys(batch, "\n".join(context_rows))
+    worker_count = min(3, len(keys), len(batches))
+    with ThreadPoolExecutor(max_workers=max(1, worker_count)) as executor:
+        futures = [executor.submit(translate_batch, index, batch) for index, batch in enumerate(batches)]
+        completed = [future.result() for future in as_completed(futures)]
+    for batch_number, batch, parsed in sorted(completed, key=lambda item: item[0]):
         translated.update(parsed)
-
         missing = [cue for cue in batch if cue["id"] not in translated]
         if missing:
-            # Repair only missing lines, beginning with the next key in rotation.
-            translated.update(
-                request_with_rotating_keys(missing, start_at=batch_number + 1)
-            )
-
+            translated.update(request_with_rotating_keys(missing, start_at=batch_number + 1))
         still_missing = [cue["id"] for cue in batch if cue["id"] not in translated]
         if still_missing:
             raise RuntimeError(
@@ -2626,11 +2626,11 @@ def character_voice_filters(tag):
     """Final role-specific tonal shaping for the four locked audio profiles."""
     mapping = {
         # Natural dialogue: restrained low-body support and a controlled presence band.
-        'M': ['equalizer=f=180:t=q:w=1.0:g=0.9', 'equalizer=f=3200:t=q:w=1.0:g=-0.8'],
-        'F': ['equalizer=f=210:t=q:w=1.0:g=0.5', 'equalizer=f=3200:t=q:w=1.0:g=-1.1'],
+        'M': ['equalizer=f=180:t=q:w=1.0:g=0.9', 'equalizer=f=2750:t=q:w=1.0:g=0.7', 'equalizer=f=3200:t=q:w=1.0:g=-0.6'],
+        'F': ['equalizer=f=210:t=q:w=1.0:g=0.5', 'equalizer=f=2850:t=q:w=1.0:g=0.6', 'equalizer=f=3200:t=q:w=1.0:g=-0.8'],
         # Inner thoughts: slightly darker and quieter, but still dry and centered.
-        'M_THINK': ['equalizer=f=200:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-1.0'],
-        'F_THINK': ['equalizer=f=230:t=q:w=1.0:g=0.3', 'equalizer=f=3000:t=q:w=1.0:g=-1.1'],
+        'M_THINK': ['equalizer=f=200:t=q:w=1.0:g=0.4', 'equalizer=f=2700:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-0.8'],
+        'F_THINK': ['equalizer=f=230:t=q:w=1.0:g=0.3', 'equalizer=f=2800:t=q:w=1.0:g=0.4', 'equalizer=f=3000:t=q:w=1.0:g=-0.9'],
     }
     return mapping.get(lock_voice_tag(tag), [])
 
@@ -2644,11 +2644,11 @@ def polish_tts_output(source_path, output_path, voice_tag):
     if voice_tag in {'M', 'F'}:
         filters = [
             'highpass=f=85:p=2',
-            'lowpass=f=6200:p=2',
+            'lowpass=f=7600:p=2',
             'equalizer=f=400:t=q:w=1.1:g=-3.2',
             'equalizer=f=3400:t=q:w=1.0:g=-1.6',
-            'equalizer=f=4700:t=q:w=1.1:g=-2.3',
-            'equalizer=f=6200:t=q:w=1.0:g=-2.0',
+            'equalizer=f=4700:t=q:w=1.1:g=-1.2',
+            'equalizer=f=6200:t=q:w=1.0:g=-1.0',
             'pan=mono|c0=c0',
             *character_voice_filters(voice_tag),
         ]

@@ -1,5 +1,12 @@
 # Changelog
 
+## v6.5.14 — Faster translation and clearer four-role voices
+
+- Added bounded parallel Gemini translation batches (up to three workers when multiple API keys are available) while preserving ordered output, ID completeness checks, key rotation, and missing-line repair.
+- Reduced the default text-only translation batch size to 45 cues so long responses finish faster and are less likely to be truncated.
+- Tuned M, F, M_THINK, and F_THINK presence bands for clearer Khmer consonants and more intelligible speech without aggressive pitch or tempo changes.
+- Kept the natural timing limits, gentle compression, loudness normalization, limiter protection, and four-role voice lock.
+
 ## v6.5.13 — Authoritative License Server login routing
 
 - Added optional remote License Server routing for Owner Code creation and customer login validation.
