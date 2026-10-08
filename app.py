@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.11"
+APP_VERSION = "6.5.12"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -804,6 +804,10 @@ VOICE_CLIP_TARGET_LUFS = -20
 VOICE_THOUGHT_RELATIVE_GAIN_DB = -1.0
 FINAL_MASTER_TARGET_LUFS = -16
 FINAL_MASTER_TRUE_PEAK_DB = -1.5
+# Smooth cue-to-cue level changes without flattening Khmer sentence emotion.
+VOICE_DYNAUDNORM_FRAME = 150
+VOICE_DYNAUDNORM_GAIN = 7
+VOICE_DYNAUDNORM_MAX_AMPLITUDE = 10
 MIN_VOICE_GAP_MS = 12
 # Keep timing correction within a more natural speech range. Larger changes
 # make Khmer neural voices sound rushed or metallic, especially on short cues.
@@ -1822,8 +1826,9 @@ def khmer_word_count(text):
 
 def contains_cjk(text):
     return bool(re.search(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]", text or ""))
-
-
+def contains_khmer(text):
+    """Return True when a translation contains actual Khmer script."""
+    return bool(re.search(r"[\u1780-\u17FF\u19E0-\u19FF]", text or ""))
 def normalize_dialogue(text):
     text = re.sub(r"```|<[^>]+>", "", str(text or ""))
     text = re.sub(r"\s+", " ", text).strip()
@@ -1858,6 +1863,8 @@ def translation_needs_repair(cue, item, target_language=DEFAULT_TARGET_LANGUAGE)
         return True
     target_is_khmer = target_language_details(target_language)["code"] == "km"
     if target_is_khmer and contains_cjk(dialogue):
+        return True
+    if target_is_khmer and not contains_khmer(dialogue):
         return True
     # Khmer tokenization needs a spoken-length guard; other targets rely on the
     # model's target-language instruction without applying a Khmer word count.
@@ -1900,7 +1907,7 @@ def repair_translation_items(
                     tag = items.get(cue_id, {}).get("tag", "M")
                 dialogue = normalize_dialogue(row.get("text"))
                 target_is_khmer = target_language_details(target_language)["code"] == "km"
-                if dialogue and (not target_is_khmer or not contains_cjk(dialogue)):
+                if dialogue and (not target_is_khmer or (contains_khmer(dialogue) and not contains_cjk(dialogue))):
                     items[cue_id] = {"tag": tag, "text": dialogue}
     bad_ids = [
         cue["id"] for cue in cues
@@ -2190,7 +2197,7 @@ CUES:
         if source_cue and source_cue.get("explicit_tag"):
             tag = source_cue["input_tag"]
         dialogue = normalize_dialogue(row.get("text", ""))
-        if dialogue and (not target_is_khmer or not contains_cjk(dialogue)):
+        if dialogue and (not target_is_khmer or (contains_khmer(dialogue) and not contains_cjk(dialogue))):
             parsed[cue_id] = {"tag": tag, "text": dialogue}
     return parsed
 
@@ -2294,9 +2301,14 @@ def translate_cues_with_google(
         for cue, text in zip(batch, outputs):
             if not text:
                 raise RuntimeError(f"Google មិនបានបកប្រែបន្ទាត់ {cue['id']}")
+            cleaned = normalize_dialogue(text)
+            if target_code == "km" and (not contains_khmer(cleaned) or contains_cjk(cleaned)):
+                raise RuntimeError(
+                    f"Google មិនបានបកប្រែជាខ្មែរត្រឹមត្រូវនៅបន្ទាត់ {cue['id']}។ សូមសាកម្ដងទៀត។"
+                )
             translated[cue["id"]] = {
                 "tag": str(cue.get("tag", "M_ADULT")).upper(),
-                "text": text,
+                "text": cleaned,
             }
     return translated
 
@@ -2626,6 +2638,9 @@ def character_voice_filters(tag):
 def polish_tts_output(source_path, output_path, voice_tag):
     """Apply the same four-role polish to standalone Text-to-Speech downloads."""
     voice_tag = lock_voice_tag(voice_tag)
+    # Keep this helper self-contained because it is also used by the lightweight
+    # audio regression harness without importing the whole Streamlit module.
+    smooth_filter = 'dynaudnorm=f=150:g=7:p=0.90:m=10'
     if voice_tag in {'M', 'F'}:
         filters = [
             'highpass=f=85:p=2',
@@ -2648,6 +2663,7 @@ def polish_tts_output(source_path, output_path, voice_tag):
         ]
     filters.extend([
         'acompressor=threshold=-24dB:ratio=1.65:attack=16:release=220:makeup=1.0:knee=5',
+        smooth_filter,
         f'loudnorm=I={FINAL_MASTER_TARGET_LUFS}:TP={FINAL_MASTER_TRUE_PEAK_DB}:LRA=7',
         f'volume={VOICE_THOUGHT_RELATIVE_GAIN_DB}dB' if voice_tag in {'M_THINK', 'F_THINK'} else 'volume=0dB',
         'alimiter=limit=0.90:attack=8:release=120',
@@ -2881,6 +2897,7 @@ def create_mp3(
         voice_bus = (
             ''.join(labels)
             + f'amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0'
+            + f',dynaudnorm=f={VOICE_DYNAUDNORM_FRAME}:g={VOICE_DYNAUDNORM_GAIN}:p=0.85:m={VOICE_DYNAUDNORM_MAX_AMPLITUDE}'
         )
         if music_index is not None:
             # Split only when the sidechain compressor needs a separate voice bus.
@@ -2910,6 +2927,7 @@ def create_mp3(
             ''.join(mix_inputs)
             + f'amix=inputs={len(mix_inputs)}:duration=longest:dropout_transition=0:normalize=0,'
               'acompressor=threshold=-19dB:ratio=1.35:attack=18:release=240:makeup=1.0:knee=5,'
+              f'dynaudnorm=f={VOICE_DYNAUDNORM_FRAME}:g={VOICE_DYNAUDNORM_GAIN}:p=0.92:m={VOICE_DYNAUDNORM_MAX_AMPLITUDE},'
               f'loudnorm=I={FINAL_MASTER_TARGET_LUFS}:TP={FINAL_MASTER_TRUE_PEAK_DB}:LRA=7,'
               'alimiter=limit=0.90:attack=8:release=150,'
               f'apad=whole_dur={total:.3f},atrim=0:{total:.3f}[out]'

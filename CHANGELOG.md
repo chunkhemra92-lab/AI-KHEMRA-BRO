@@ -1,5 +1,12 @@
 # Changelog
 
+## v6.5.12 — Natural Khmer audio and translation validation
+
+- Added conservative `dynaudnorm` smoothing on the voice bus, final master, and standalone TTS output to reduce cue-to-cue loudness jumps without removing natural emotion.
+- Kept the existing gentle tempo range (`0.86x–1.18x`), centered dry dialogue, light compression, and `-16 LUFS` final master target.
+- Added Khmer-script validation to Gemini/Google translation acceptance paths so non-Khmer or mixed Chinese output is rejected before TTS.
+- Normalized accepted Google translation text before it reaches the dubbing engine.
+
 ## v6.5.11 — Simplified speech settings
 
 Removes the confusing Speech Provider dropdown from Settings. The customer workflow now uses the single built-in Edge TTS route with the four locked Khmer voice roles; the backend compatibility functions remain private and are not exposed as user choices.
