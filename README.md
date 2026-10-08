@@ -1,8 +1,8 @@
-# AI KHEMRA BRO v6.5.6
+# AI KHEMRA BRO v6.5.13
 
 AI KHEMRA BRO is a Streamlit application for the **Video → Whisper → Khmer SRT → MP3** workflow. It uses Gemini for translation and subtitle generation, faster-whisper for transcription, FFmpeg for media processing, and Edge TTS for Khmer voice output.
 
-> **Version note:** This README documents the v6.5.6 release, including natural four-role Khmer voice polish, the complete Gemini 2.5–3.8 translation catalog, PyAV compatibility fix, always-visible video preview, and simplified SRT editor controls.
+> **Version note:** This README documents the v6.5.13 release, including natural four-role Khmer voice polish, Khmer translation validation, stable TTS loudness smoothing, and optional authoritative License Server routing for Access Codes.
 
 ## Runtime highlights
 
@@ -14,6 +14,7 @@ AI KHEMRA BRO is a Streamlit application for the **Video → Whisper → Khmer S
 - Multi-voice audio processing with FFmpeg.
 - Persistent SQLite license data for Docker deployments.
 - Persistent faster-whisper model storage in Docker deployments.
+- Optional License Server integration: configure `LICENSE_SERVICE_URL`, `LICENSE_SERVICE_KEY`, and `LICENSE_ADMIN_KEY` to make the remote service the single source of truth for Access Codes.
 
 ## Run locally
 
@@ -44,11 +45,11 @@ docker compose logs --tail=100 app
 
 The app listens internally on port `8501`. Caddy is the public entry point on ports `80` and `443`. Docker volumes preserve the license database and downloaded faster-whisper models. Follow [DEPLOY_VPS.md](DEPLOY_VPS.md) for the complete VPS procedure, backup guidance, and rollback steps.
 
-## v6.5.6 release checklist
+## v6.5.13 release checklist
 
-Before calling a deployment v6.5.6, verify all of the following:
+Before calling a deployment v6.5.13, verify all of the following:
 
-1. Confirm `APP_VERSION` in `app.py` is `6.5.6`.
+1. Confirm `APP_VERSION` in `app.py` is `6.5.13`.
 2. Review and test the pinned runtime dependencies in `requirements.txt`.
 3. Run the source checks and the relevant audio, subtitle-timing, language, and deployment tests.
 4. Build the Docker image from a clean checkout and confirm that the image contains only runtime files. Development tests, audit scripts, historical reports, and generated metrics are excluded by `.dockerignore`.
@@ -64,8 +65,8 @@ for test in test_*.py; do python "$test"; done
 8. Tag the verified commit, for example:
 
 ```bash
-git tag -a v6.5.6 -m "AI KHEMRA BRO v6.5.6"
-git push origin v6.5.6
+git tag -a v6.5.13 -m "AI KHEMRA BRO v6.5.13"
+git push origin v6.5.13
 ```
 
 ## Mobile repository setup
@@ -105,15 +106,15 @@ git status --short --branch
 git remote -v
 ```
 
-Before connecting the mobile client to the v6.5.6 backend, configure the API base URL through the mobile project’s environment mechanism (for example, an `.env` file or platform-specific config). Do not hard-code private API keys, owner passwords, license secrets, or signing credentials in the mobile repository.
+Before connecting the mobile client to the v6.5.13 backend, configure the API base URL through the mobile project’s environment mechanism (for example, an `.env` file or platform-specific config). Do not hard-code private API keys, owner passwords, license secrets, or signing credentials in the mobile repository.
 
 Use separate development and production endpoints, test authentication and upload behavior against a non-production deployment first, and commit only non-secret example configuration such as `.env.example`.
 
 ### Mobile release handoff
 
-For a v6.5.6 mobile release, confirm that:
+For a v6.5.13 mobile release, confirm that:
 
-- The mobile client points to the verified v6.5.6 backend endpoint.
+- The mobile client points to the verified v6.5.13 backend endpoint.
 - Khmer subtitle text and generated audio are rendered correctly on supported devices.
 - Upload, timeout, retry, and error states are tested on a real network.
 - No secrets or generated media are committed.
