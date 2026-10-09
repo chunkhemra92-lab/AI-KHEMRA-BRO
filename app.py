@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from google import genai
 from faster_whisper import WhisperModel
 
-APP_VERSION = "6.5.14"
+APP_VERSION = "6.5.15"
 
 st.set_page_config(page_title=f'AI KHEMRA BRO v{APP_VERSION}', page_icon='🎬', layout='wide', initial_sidebar_state='collapsed')
 
@@ -2213,7 +2213,10 @@ def translate_cues_text_only(
     if not keys:
         raise ValueError("មិនមាន Gemini API Key សម្រាប់ប្រើទេ។")
     batch_size = 45
-    batches = [cues[offset:offset + batch_size] for offset in range(0, len(cues), batch_size)]
+    batches = [
+        (batch_number, offset, cues[offset:offset + batch_size])
+        for batch_number, offset in enumerate(range(0, len(cues), batch_size))
+    ]
 
     def request_with_rotating_keys(request_batch, context="", start_at=0):
         last_error = None
@@ -2231,13 +2234,12 @@ def translate_cues_text_only(
                     raise
         raise RuntimeError(friendly_ai_error(last_error, len(keys)))
 
-    def translate_batch(batch_number, batch):
+    def translate_batch(batch_number, offset, batch):
         # Source-only continuity keeps parallel requests independent and avoids
         # waiting for the previous batch while still giving the model scene context.
-        start = cues.index(batch[0])
         context_rows = [
             f'ID={cue["id"]} SOURCE={cue["source"]}'
-            for cue in cues[max(0, start - 6):start]
+            for cue in cues[max(0, offset - 6):offset]
         ]
         return batch_number, batch, request_with_rotating_keys(
             batch, "\n".join(context_rows), start_at=batch_number
@@ -2246,7 +2248,10 @@ def translate_cues_text_only(
     translated = {}
     worker_count = min(3, len(keys), len(batches))
     with ThreadPoolExecutor(max_workers=max(1, worker_count)) as executor:
-        futures = [executor.submit(translate_batch, index, batch) for index, batch in enumerate(batches)]
+        futures = [
+            executor.submit(translate_batch, batch_number, offset, batch)
+            for batch_number, offset, batch in batches
+        ]
         completed = [future.result() for future in as_completed(futures)]
     for batch_number, batch, parsed in sorted(completed, key=lambda item: item[0]):
         translated.update(parsed)
@@ -2259,6 +2264,26 @@ def translate_cues_text_only(
                 "AI មិនបានត្រឡប់បន្ទាត់ SRT គ្រប់គ្រាន់៖ "
                 + ", ".join(map(str, still_missing[:20]))
             )
+
+    # Parallel batches intentionally do not share generated Khmer context. Run
+    # a cheap deterministic gate after merging and repair only lines that are
+    # missing, non-Khmer, mixed-script, or too long for their cue window.
+    invalid = [
+        cue for cue in cues
+        if translation_needs_repair(cue, translated.get(cue["id"]), target_language)
+    ]
+    for offset in range(0, len(invalid), 20):
+        repair_batch = invalid[offset:offset + 20]
+        translated.update(request_with_rotating_keys(repair_batch, start_at=offset + 1))
+    invalid_after_repair = [
+        cue["id"] for cue in cues
+        if translation_needs_repair(cue, translated.get(cue["id"]), target_language)
+    ]
+    if invalid_after_repair:
+        raise RuntimeError(
+            "AI បានបកប្រែបន្ទាត់មួយចំនួនមិនទាន់មានគុណភាពគ្រប់គ្រាន់៖ "
+            + ", ".join(map(str, invalid_after_repair[:20]))
+        )
     return translated
 
 

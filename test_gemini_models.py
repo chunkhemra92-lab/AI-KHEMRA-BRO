@@ -19,7 +19,9 @@ for model in EXPECTED_MODELS:
     assert f'"{model}"' in SOURCE, f"missing translation model: {model}"
 assert 'DEFAULT_GEMINI_TRANSLATION_MODEL = "gemini-3.8-flash"' in SOURCE
 assert 'def _candidate_gemini_models(selected_model):' in SOURCE
-assert 'batch_size = 60' in SOURCE
+assert 'batch_size = 45' in SOURCE
+assert 'worker_count = min(3, len(keys), len(batches))' in SOURCE
+assert 'translation_needs_repair(cue, translated.get(cue["id"]), target_language)' in SOURCE
 assert 'missing = [cue for cue in batch if cue["id"] not in translated]' in SOURCE
 assert 'still_missing = [cue["id"] for cue in batch if cue["id"] not in translated]' in SOURCE
 print("Complete Gemini 2.5–3.8 translation catalog and no-loss repair assertions passed")

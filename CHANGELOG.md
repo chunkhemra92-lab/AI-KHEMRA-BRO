@@ -1,5 +1,12 @@
 # Changelog
 
+## v6.5.15 — Parallel translation hardening
+
+- Replaced duplicate-sensitive batch position lookup with stable batch offsets.
+- Added a deterministic post-merge quality gate for missing, non-Khmer, mixed-script, and overlong translations.
+- Repairs only invalid cues after the parallel pass, keeping the fast path quick while protecting subtitle quality.
+- Added regression coverage for the 45-cue batch size, bounded worker count, and post-merge repair gate.
+
 ## v6.5.14 — Faster translation and clearer four-role voices
 
 - Added bounded parallel Gemini translation batches (up to three workers when multiple API keys are available) while preserving ordered output, ID completeness checks, key rotation, and missing-line repair.
