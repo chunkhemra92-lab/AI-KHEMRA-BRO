@@ -35,13 +35,15 @@ TOPUP_CONTACT = os.getenv("TOPUP_CONTACT", "088 395 1538")
 TELEGRAM_URL = os.getenv("TELEGRAM_URL", "https://t.me/moviematlydubber")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-st.set_page_config(page_title="MATLY MOVIE STORE", page_icon="🎬", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="MATLY MOVIE STORE", page_icon="🎬", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Noto+Sans+Khmer:wght@400;600;700&display=swap');
 :root{--bg:#070b14;--line:rgba(148,163,184,.18);--cyan:#45d9ff;--gold:#f5c451;--muted:#9aa9bd}
 .stApp{background:radial-gradient(circle at 50% -15%,rgba(25,118,210,.22),transparent 34rem),var(--bg);color:#f6f9ff;font-family:'Manrope','Noto Sans Khmer',sans-serif}.block-container{max-width:1200px;padding-top:1rem;padding-bottom:4rem}
 .hero{padding:30px 22px;border:1px solid rgba(69,217,255,.35);border-radius:26px;background:linear-gradient(145deg,rgba(23,40,69,.94),rgba(8,14,25,.98));box-shadow:0 20px 50px rgba(0,0,0,.22);margin-bottom:14px}.hero h1{font-size:clamp(30px,6vw,58px);margin:0;font-weight:800;letter-spacing:-2px}.hero p{color:var(--cyan);font-weight:700;letter-spacing:1px;margin:.5rem 0 0}.section{font-size:26px;font-weight:800;margin:26px 0 12px}.section small{color:var(--muted);font-size:12px;letter-spacing:1px;margin-left:8px}.card{background:linear-gradient(145deg,#14243a,#0e1727);border:1px solid var(--line);border-radius:18px;padding:12px;height:100%;box-shadow:0 10px 28px rgba(0,0,0,.15)}.card img{border-radius:13px}.price{color:var(--gold);font-size:18px;font-weight:800}.muted{color:var(--muted);font-size:13px}.stButton>button,.stLinkButton a{border-radius:12px;font-weight:800;min-height:44px;background:linear-gradient(100deg,#126bc1,#22bddc);border:1px solid rgba(120,220,255,.25)}.wallet{background:linear-gradient(135deg,#1b3b62,#15243a);border:1px solid rgba(69,217,255,.3);border-radius:16px;padding:15px 18px}.wallet b{font-size:26px;color:var(--gold)}.stTextInput input,.stTextArea textarea,.stNumberInput input{background:#182438!important;color:white!important;border:1px solid #52657f!important;border-radius:10px!important}.stTabs [data-baseweb="tab-list"]{gap:6px;background:rgba(15,23,38,.9);border:1px solid var(--line);border-radius:16px;padding:6px}.stTabs [data-baseweb="tab"]{border-radius:11px;color:#aebbd0;font-weight:800}.stTabs [aria-selected="true"]{background:linear-gradient(100deg,#1976d2,#22bddc);color:#fff}.quick{background:#101d30;border:1px solid var(--line);border-radius:15px;padding:12px;text-align:center}.feature{background:linear-gradient(110deg,rgba(18,107,193,.95),rgba(9,26,49,.96));border:1px solid rgba(69,217,255,.35);border-radius:22px;padding:24px;min-height:190px}.feature h2{font-size:clamp(24px,4vw,42px);margin:8px 0}.feature .badge{color:#ffcf5a;font-weight:800;letter-spacing:.8px}.footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0;color:var(--muted);font-size:13px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin-bottom:12px;background:rgba(8,14,25,.92);border:1px solid var(--line);border-radius:16px;position:sticky;top:8px;z-index:10;backdrop-filter:blur(14px)}.brand{font-size:18px;font-weight:900;letter-spacing:.4px}.brand span{color:var(--cyan)}.toplinks{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}.toplinks span{padding:7px 10px;border-radius:9px;color:#b7c5d8;font-size:12px;font-weight:800}.toplinks span.active{background:linear-gradient(100deg,#1976d2,#22bddc);color:white}.top-actions{display:flex;gap:7px}.top-pill{border:1px solid rgba(245,196,81,.4);color:#ffd66a;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800}.bottom-nav{display:none}@media(max-width:700px){.topbar{position:relative;top:0;display:block;text-align:center}.brand{margin-bottom:7px}.toplinks{overflow:hidden;flex-wrap:nowrap;justify-content:flex-start}.toplinks span{white-space:nowrap}.top-actions{justify-content:center;margin-top:7px}.bottom-nav{display:flex;position:fixed;left:8px;right:8px;bottom:8px;z-index:20;justify-content:space-around;background:rgba(8,14,25,.96);border:1px solid rgba(69,217,255,.3);border-radius:16px;padding:8px;box-shadow:0 10px 34px rgba(0,0,0,.45)}.bottom-nav div{font-size:11px;color:#b7c5d8;text-align:center;font-weight:800}.bottom-nav .active{color:var(--cyan)}}
+
+.studio-nav{background:linear-gradient(145deg,#101d30,#0b1322);border:1px solid rgba(245,196,81,.22);border-radius:14px;padding:12px;margin:8px 0 16px}.studio-shell{background:radial-gradient(circle at 50% 0%,rgba(31,88,139,.28),transparent 48%),linear-gradient(145deg,#101827,#0a0f19);border:1px solid rgba(69,217,255,.25);border-radius:24px;padding:22px;box-shadow:0 18px 55px rgba(0,0,0,.24)}.studio-header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}.studio-header h1{margin:0;font-size:clamp(24px,4vw,38px);letter-spacing:-1px}.studio-header p{margin:5px 0 0;color:var(--muted)}.studio-badge{border:1px solid rgba(245,196,81,.55);border-radius:999px;color:#ffcf5a;padding:8px 12px;font-size:12px;font-weight:900;white-space:nowrap}.studio-kpi{background:linear-gradient(145deg,#14243a,#0e1727);border:1px solid var(--line);border-radius:16px;padding:15px;min-height:92px}.studio-kpi small{color:var(--muted);font-size:12px}.studio-kpi b{display:block;color:#f7fbff;font-size:27px;margin-top:5px}.studio-panel{background:rgba(10,17,29,.68);border:1px solid var(--line);border-radius:18px;padding:18px;height:100%}.studio-panel h3{margin-top:0}.studio-note{border-left:3px solid #f5c451;background:rgba(245,196,81,.08);padding:12px 14px;border-radius:8px;color:#d8e1ef}.studio-list{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding:12px 0}.studio-list:last-child{border-bottom:0}@media(max-width:700px){.studio-shell{padding:14px}.studio-header{display:block}.studio-badge{display:inline-block;margin-top:12px}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -120,6 +122,9 @@ st.markdown('<div class="topbar"><div class="brand">MOVIE.<span>MATLYDUBBER</spa
 st.markdown('<div class="hero"><h1>🎬 MATLY MOVIE STORE</h1><p>មើលរឿងថ្មីៗ ជាភាសាខ្មែរ · ទិញមើលបានភ្លាមៗ</p></div>', unsafe_allow_html=True)
 
 with st.sidebar:
+    st.markdown('<div class="studio-nav"><b>🎬 MOVIE.<span style="color:#45d9ff">MATLYDUBBER</span></b><br><small style="color:#9aa9bd">ទំព័រគ្រប់គ្រងភាពយន្ត</small></div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#45d9ff;font-weight:900;padding:4px 8px">⌂ ទំព័រដើម</div><div style="color:#b7c5d8;padding:4px 8px">◉ Movie Feed</div><div style="color:#b7c5d8;padding:4px 8px">🔥 កំពុងពេញនិយម</div><div style="color:#b7c5d8;padding:4px 8px">🆓 រឿង Free</div><div style="color:#b7c5d8;padding:4px 8px">📺 រឿងភាគ</div><div style="color:#b7c5d8;padding:4px 8px">🎌 Anime</div>', unsafe_allow_html=True)
+    st.divider()
     st.markdown("### គណនីអ្នកមើល")
     entered = st.text_input("ឈ្មោះអ្នកប្រើ", value=st.session_state.customer_name, placeholder="ឧ. Khemra")
     if st.button("ចូលប្រើ / ប្តូរគណនី", use_container_width=True): st.session_state.customer_name = entered.strip() or "Guest"; st.rerun()
@@ -205,20 +210,38 @@ with tabs[2]:
 
 if st.session_state.admin:
     with tabs[3]:
-        st.markdown('<div class="section">Admin Studio — គ្រប់គ្រងហាង</div>', unsafe_allow_html=True)
-        with st.form("add_movie", clear_on_submit=True):
-            st.subheader("បញ្ចូលរឿងថ្មី"); title = st.text_input("ចំណងជើង *"); description = st.text_area("ការពិពណ៌នា")
-            a,b,c,d = st.columns(4); genre_new = a.text_input("ប្រភេទ", "Drama"); country = b.text_input("ប្រទេស", "Cambodia"); price = c.number_input("តម្លៃកាក់", min_value=0, value=20, step=5); featured = d.checkbox("ដាក់ជា HOT")
-            poster_url = st.text_input("Poster URL (https://...)"); video_url = st.text_input("Video URL (https://...)")
-            if st.form_submit_button("បោះពុម្ពរឿង"):
-                if not title.strip(): st.error("សូមបញ្ចូលចំណងជើង")
-                elif poster_url and not valid_url(poster_url): st.error("Poster URL មិនត្រឹមត្រូវ")
-                elif video_url and not valid_url(video_url): st.error("Video URL មិនត្រឹមត្រូវ")
-                else:
-                    with db() as conn: conn.execute("INSERT INTO movies(title,description,genre,country,poster_url,video_url,price,featured,created_at) VALUES(?,?,?,?,?,?,?,?,?)", (title.strip(), description.strip(), genre_new.strip() or "Drama", country.strip() or "Cambodia", poster_url.strip(), video_url.strip(), int(price), int(featured), datetime.utcnow().isoformat(timespec="seconds")))
-                    st.success("បានបោះពុម្ពរឿងថ្មី"); st.rerun()
-        st.divider(); st.subheader("សំណើបញ្ចូលកាក់")
-        with db() as conn: topups = conn.execute("SELECT t.*,c.name FROM topups t JOIN customers c ON c.id=t.customer_id WHERE t.status='pending' ORDER BY t.id DESC").fetchall()
+        with db() as conn:
+            movie_count = conn.execute("SELECT COUNT(*) FROM movies").fetchone()[0]
+            customer_count = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+            purchase_count = conn.execute("SELECT COUNT(*) FROM purchases").fetchone()[0]
+            pending_count = conn.execute("SELECT COUNT(*) FROM topups WHERE status='pending'").fetchone()[0]
+            topups = conn.execute("SELECT t.*,c.name FROM topups t JOIN customers c ON c.id=t.customer_id WHERE t.status='pending' ORDER BY t.id DESC").fetchall()
+
+        st.markdown('<div class="studio-shell"><div class="studio-header"><div><h1>Creator Studio</h1><p>ផ្ទាំងគ្រប់គ្រងសម្រាប់បោះពុម្ព និងគ្រប់គ្រងភាពយន្ត</p></div><div class="studio-badge">● ADMIN VERIFIED · MATLY STUDIO</div></div>', unsafe_allow_html=True)
+        k1, k2, k3, k4 = st.columns(4)
+        for col, label, value in [(k1, "ភាពយន្តក្នុងកាតាឡុក", movie_count), (k2, "អ្នកប្រើប្រាស់", customer_count), (k3, "ការទិញសរុប", purchase_count), (k4, "សំណើរង់ចាំ", pending_count)]:
+            with col: st.markdown(f'<div class="studio-kpi"><small>{label}</small><b>{value:,}</b></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:18px"></div>', unsafe_allow_html=True)
+        left, right = st.columns([1.35, .85])
+        with left:
+            st.markdown('<div class="studio-panel"><h3>🎬 បោះពុម្ពរឿងថ្មី</h3><div class="studio-note">បញ្ចូលតំណ Poster និង Video ដែលអ្នកមានសិទ្ធិផ្សព្វផ្សាយ។ កំណត់តម្លៃ 0 ដើម្បីបើកមើលដោយឥតគិតថ្លៃ។</div>', unsafe_allow_html=True)
+            with st.form("add_movie", clear_on_submit=True):
+                title = st.text_input("ចំណងជើង *"); description = st.text_area("ការពិពណ៌នា")
+                a,b,c,d = st.columns(4); genre_new = a.text_input("ប្រភេទ", "Drama"); country = b.text_input("ប្រទេស", "Cambodia"); price = c.number_input("តម្លៃកាក់", min_value=0, value=20, step=5); featured = d.checkbox("ដាក់ជា HOT")
+                poster_url = st.text_input("Poster URL (https://...)"); video_url = st.text_input("Video URL (https://...)")
+                if st.form_submit_button("🚀 បោះពុម្ពរឿង"):
+                    if not title.strip(): st.error("សូមបញ្ចូលចំណងជើង")
+                    elif poster_url and not valid_url(poster_url): st.error("Poster URL មិនត្រឹមត្រូវ")
+                    elif video_url and not valid_url(video_url): st.error("Video URL មិនត្រឹមត្រូវ")
+                    else:
+                        with db() as conn: conn.execute("INSERT INTO movies(title,description,genre,country,poster_url,video_url,price,featured,created_at) VALUES(?,?,?,?,?,?,?,?,?)", (title.strip(), description.strip(), genre_new.strip() or "Drama", country.strip() or "Cambodia", poster_url.strip(), video_url.strip(), int(price), int(featured), datetime.utcnow().isoformat(timespec="seconds")))
+                        st.success("បានបោះពុម្ពរឿងថ្មី"); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        with right:
+            st.markdown('<div class="studio-panel"><h3>⚡ Quick actions</h3><div class="studio-list"><div><strong>Catalog</strong><small>គ្រប់គ្រងចំណងជើង និងតម្លៃ</small></div><span>🎞️</span></div><div class="studio-list"><div><strong>Payments</strong><small>ពិនិត្យការបញ្ចូលកាក់</small></div><span>🪙</span></div><div class="studio-list"><div><strong>Publishing</strong><small>បោះពុម្ពបានភ្លាមៗ</small></div><span>✓</span></div><div class="studio-note" style="margin-top:14px">សូមរក្សាទុកតំណវីដេអូឱ្យមានសុវត្ថិភាព និងផ្សព្វផ្សាយតែមាតិកាដែលមានសិទ្ធិ។</div></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:18px"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="studio-panel"><h3>🪙 សំណើបញ្ចូលកាក់</h3>', unsafe_allow_html=True)
+        if not topups: st.caption("មិនមានសំណើរង់ចាំទេ។")
         for topup in topups:
             st.write(f"{topup['name']} · 🪙 {topup['coins']} · {topup['reference'] or 'គ្មានលេខយោង'}"); x, y = st.columns(2)
             if x.button("អនុម័ត", key=f"approve_{topup['id']}"):
@@ -227,6 +250,7 @@ if st.session_state.admin:
             if y.button("បដិសេធ", key=f"reject_{topup['id']}"):
                 with db() as conn: conn.execute("UPDATE topups SET status='rejected' WHERE id=?", (topup["id"],))
                 st.rerun()
+        st.markdown('</div></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="bottom-nav"><div class="active">⌂<br>ទំព័រដើម</div><div>▣<br>វីដេអូខ្លី</div><div>🪙<br>បញ្ចូលកាក់</div><div>⌕<br>ស្វែងរក</div><div>☰<br>ម៉ឺនុយ</div></div>', unsafe_allow_html=True)
 st.divider(); st.caption(f"MATLY MOVIE STORE v{APP_VERSION} · ទិញមាតិកាដោយសុវត្ថិភាព និងគោរពសិទ្ធិអ្នកកាន់កាប់មាតិកា")
