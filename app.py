@@ -21,7 +21,7 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Noto+Sans+Khmer:wght@400;600;700&display=swap');
 :root{--bg:#070b14;--line:rgba(148,163,184,.18);--cyan:#45d9ff;--gold:#f5c451;--muted:#9aa9bd}
 .stApp{background:radial-gradient(circle at 50% -15%,rgba(25,118,210,.22),transparent 34rem),var(--bg);color:#f6f9ff;font-family:'Manrope','Noto Sans Khmer',sans-serif}.block-container{max-width:1200px;padding-top:1rem;padding-bottom:4rem}
-.hero{padding:34px 20px;border:1px solid rgba(69,217,255,.35);border-radius:26px;background:linear-gradient(145deg,rgba(23,40,69,.94),rgba(8,14,25,.98));box-shadow:0 20px 50px rgba(0,0,0,.22);margin-bottom:18px}.hero h1{font-size:clamp(30px,6vw,58px);margin:0;font-weight:800;letter-spacing:-2px}.hero p{color:var(--cyan);font-weight:700;letter-spacing:1px;margin:.5rem 0 0}.section{font-size:26px;font-weight:800;margin:22px 0 12px}.card{background:linear-gradient(145deg,#14243a,#0e1727);border:1px solid var(--line);border-radius:18px;padding:16px;height:100%;box-shadow:0 10px 28px rgba(0,0,0,.15)}.price{color:var(--gold);font-size:18px;font-weight:800}.muted{color:var(--muted);font-size:13px}.stButton>button,.stLinkButton a{border-radius:12px;font-weight:800;min-height:44px;background:linear-gradient(100deg,#126bc1,#22bddc);border:1px solid rgba(120,220,255,.25)}.wallet{background:linear-gradient(135deg,#1b3b62,#15243a);border:1px solid rgba(69,217,255,.3);border-radius:16px;padding:15px 18px}.wallet b{font-size:26px;color:var(--gold)}.stTextInput input,.stTextArea textarea,.stNumberInput input{background:#182438!important;color:white!important;border:1px solid #52657f!important;border-radius:10px!important}.stTabs [data-baseweb="tab-list"]{gap:6px;background:rgba(15,23,38,.9);border:1px solid var(--line);border-radius:16px;padding:6px}.stTabs [data-baseweb="tab"]{border-radius:11px;color:#aebbd0;font-weight:800}.stTabs [aria-selected="true"]{background:linear-gradient(100deg,#1976d2,#22bddc);color:#fff}
+.hero{padding:30px 22px;border:1px solid rgba(69,217,255,.35);border-radius:26px;background:linear-gradient(145deg,rgba(23,40,69,.94),rgba(8,14,25,.98));box-shadow:0 20px 50px rgba(0,0,0,.22);margin-bottom:14px}.hero h1{font-size:clamp(30px,6vw,58px);margin:0;font-weight:800;letter-spacing:-2px}.hero p{color:var(--cyan);font-weight:700;letter-spacing:1px;margin:.5rem 0 0}.section{font-size:26px;font-weight:800;margin:26px 0 12px}.section small{color:var(--muted);font-size:12px;letter-spacing:1px;margin-left:8px}.card{background:linear-gradient(145deg,#14243a,#0e1727);border:1px solid var(--line);border-radius:18px;padding:12px;height:100%;box-shadow:0 10px 28px rgba(0,0,0,.15)}.card img{border-radius:13px}.price{color:var(--gold);font-size:18px;font-weight:800}.muted{color:var(--muted);font-size:13px}.stButton>button,.stLinkButton a{border-radius:12px;font-weight:800;min-height:44px;background:linear-gradient(100deg,#126bc1,#22bddc);border:1px solid rgba(120,220,255,.25)}.wallet{background:linear-gradient(135deg,#1b3b62,#15243a);border:1px solid rgba(69,217,255,.3);border-radius:16px;padding:15px 18px}.wallet b{font-size:26px;color:var(--gold)}.stTextInput input,.stTextArea textarea,.stNumberInput input{background:#182438!important;color:white!important;border:1px solid #52657f!important;border-radius:10px!important}.stTabs [data-baseweb="tab-list"]{gap:6px;background:rgba(15,23,38,.9);border:1px solid var(--line);border-radius:16px;padding:6px}.stTabs [data-baseweb="tab"]{border-radius:11px;color:#aebbd0;font-weight:800}.stTabs [aria-selected="true"]{background:linear-gradient(100deg,#1976d2,#22bddc);color:#fff}.quick{background:#101d30;border:1px solid var(--line);border-radius:15px;padding:12px;text-align:center}.feature{background:linear-gradient(110deg,rgba(18,107,193,.95),rgba(9,26,49,.96));border:1px solid rgba(69,217,255,.35);border-radius:22px;padding:24px;min-height:190px}.feature h2{font-size:clamp(24px,4vw,42px);margin:8px 0}.feature .badge{color:#ffcf5a;font-weight:800;letter-spacing:.8px}.footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0;color:var(--muted);font-size:13px}
 </style>
 """, unsafe_allow_html=True)
 
@@ -115,24 +115,53 @@ customer = get_customer(st.session_state.customer_name or "Guest")
 tabs = st.tabs(["🏠 កាតាឡុក", "🪙 បញ្ចូលកាក់", "🎞️ រឿងដែលបានទិញ"] + (["⚙️ Admin Studio"] if st.session_state.admin else []))
 
 with tabs[0]:
-    c1, c2 = st.columns([2, 1]); search = c1.text_input("ស្វែងរករឿង", placeholder="វាយចំណងជើង ឬប្រភេទ...")
+    all_movies = movie_rows()
+    featured = all_movies[0] if all_movies else None
+    if featured:
+        left, right = st.columns([2.2, 1])
+        with left:
+            st.markdown(f'<div class="feature"><div class="badge">🔥 កំពុងពេញនិយម · MOVIE FEED</div><h2>{featured["title"]}</h2><p>{featured["description"] or "មើលរឿងពេញនិយមថ្មីៗនៅទីនេះ។"}</p><p>★ 9.8 · 2026 · {featured["genre"]}</p></div>', unsafe_allow_html=True)
+        with right:
+            st.markdown('<div class="quick"><b>VIP MEMBERSHIP</b><br><span class="price">$10 / month</span><br><span class="muted">មើលរឿងពិសេស និងរឿងថ្មីៗ</span></div>', unsafe_allow_html=True)
+            if featured["video_url"]: st.link_button("▶️ ទស្សនាឥឡូវ", featured["video_url"], use_container_width=True)
+    st.markdown('<div class="section">ចូលមើលលឿន <small>QUICK ACCESS</small></div>', unsafe_allow_html=True)
+    q1,q2,q3,q4,q5,q6 = st.columns(6)
+    quick_items = [(q1,"🔥","កំពុងពេញនិយម"),(q2,"🆕","រឿងថ្មី"),(q3,"🎬","រឿងដុំ"),(q4,"📺","រឿងភាគ"),(q5,"⚡","Anime"),(q6,"🆓","Free")]
+    for col, icon, label in quick_items:
+        with col: st.markdown(f'<div class="quick">{icon}<br><b>{label}</b></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns([2, 1]); search = c1.text_input("ស្វែងរករឿង", placeholder="ស្វែងរកចំណងជើង ឬប្រភេទ...")
     with db() as conn: genres = [r[0] for r in conn.execute("SELECT DISTINCT genre FROM movies ORDER BY genre").fetchall()]
-    genre = c2.selectbox("ប្រភេទ", ["All"] + genres); rows = movie_rows(search, genre)
-    st.markdown(f'<div class="section">រឿងសម្រាប់អ្នក <span class="muted">({len(rows)} titles)</span></div>', unsafe_allow_html=True)
-    if not rows: st.info("មិនទាន់មានរឿងត្រូវនឹងការស្វែងរកទេ។")
-    for start in range(0, len(rows), 3):
-        cols = st.columns(3)
-        for col, movie in zip(cols, rows[start:start+3]):
-            with col:
-                owned = is_owned(customer["id"], movie["id"])
-                st.markdown('<div class="card">', unsafe_allow_html=True); st.image(image_for(movie), use_container_width=True); st.markdown(f"### {movie['title']}"); st.caption(f"{movie['country']} · {movie['genre']}"); st.write(movie["description"] or "មិនទាន់មានការពិពណ៌នា")
-                st.markdown(f'<div class="price">{"បានទិញរួច ✓" if owned else f"🪙 {movie["price"]:,} កាក់"}</div>', unsafe_allow_html=True)
-                if owned:
-                    if movie["video_url"]: st.link_button("▶️ មើលរឿង", movie["video_url"], use_container_width=True)
-                    else: st.info("Admin មិនទាន់ដាក់ Video URL")
-                elif st.button("ទិញរឿងនេះ", key=f"buy_{movie['id']}", use_container_width=True):
-                    ok, msg = buy_movie(customer["id"], movie); (st.success if ok else st.warning)(msg); st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+    genre = c2.selectbox("ប្រភេទ", ["All"] + genres)
+    filtered = movie_rows(search, genre)
+
+    def render_section(title, subtitle, rows, key_prefix):
+        st.markdown(f'<div class="section">{title} <small>{subtitle}</small></div>', unsafe_allow_html=True)
+        if not rows: st.caption("មិនទាន់មានរឿងនៅផ្នែកនេះទេ។"); return
+        for row_start in range(0, min(len(rows), 6), 3):
+            cols = st.columns(3)
+            for col, movie in zip(cols, rows[row_start:row_start+3]):
+                with col:
+                    owned = is_owned(customer["id"], movie["id"])
+                    st.markdown('<div class="card">', unsafe_allow_html=True)
+                    st.image(image_for(movie), use_container_width=True)
+                    badge = "FREE 100%" if movie["price"] == 0 else ("💎 VIP" if movie["featured"] else "NEW")
+                    st.caption(f"{badge} · {movie['genre']} · ★ 9.2")
+                    st.markdown(f"### {movie['title']}")
+                    st.caption(f"2026 · {movie['country']}")
+                    if owned or movie["price"] == 0:
+                        if movie["video_url"]: st.link_button("▶️ មើលរឿង", movie["video_url"], use_container_width=True)
+                        else: st.success("ឥតគិតថ្លៃ" if movie["price"] == 0 else "Admin មិនទាន់ដាក់ Video URL")
+                    elif st.button(f"🪙 {movie['price']} · ទិញ", key=f"{key_prefix}_{movie['id']}", use_container_width=True):
+                        ok, msg = buy_movie(customer["id"], movie); (st.success if ok else st.warning)(msg); st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+    render_section("រឿងទើបបញ្ចូលថ្មីៗ", "LATEST RELEASES", filtered or all_movies, "latest")
+    render_section("រឿងទស្សនាឥតគិតថ្លៃ", "100% FREE", [m for m in all_movies if m["price"] == 0], "free")
+    render_section("កំពុងពេញនិយម", "TRENDING NOW", [m for m in all_movies if m["featured"]] or all_movies, "trending")
+    render_section("រឿងដុំ Movies", "MOVIES", [m for m in all_movies if m["genre"] in {"Action", "Drama"}] or all_movies, "movies")
+    render_section("រឿងភាគ TV Series", "TV SERIES", [m for m in all_movies if m["genre"] in {"Romance", "Drama"}] or all_movies, "series")
+    render_section("🎌 Anime & គំនូរជីវចល", "ANIME & DONGHUA", [m for m in all_movies if m["genre"] == "Anime"], "anime")
+    st.markdown('<div class="footer"><b>MATLY MOVIE STORE</b><br>ទំព័រដើម · វីដេអូខ្លី · បញ្ចូលកាក់ · ស្វែងរក · ម៉ឺនុយ<br>Telegram: t.me/moviematlydubber · 088 395 1538<br><br>ABA Pay · Bakong · KHQR</div>', unsafe_allow_html=True)
 
 with tabs[1]:
     st.markdown('<div class="section">បញ្ចូលកាក់សម្រាប់ទិញរឿង</div>', unsafe_allow_html=True)
