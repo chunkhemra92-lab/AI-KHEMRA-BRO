@@ -1,24 +1,6 @@
-# Private customer and application data
-licenses.db
-licenses.db-shm
-licenses.db-wal
-
-# Local Streamlit secrets and browser/session data
-.streamlit/secrets.toml
-
-# VPS production environment and local Docker overrides
 .env
-.env.*
-!.env.example
-docker-compose.override.yml
-
-# Python temporary files
+movie_store.db
+movie_store.db-shm
+movie_store.db-wal
 __pycache__/
-*.py[cod]
-
-# Local diagnostics, generated media, and temporary project work
-*.log
-*.tmp
-ai_khemra_bro_sessions/
-ui_test_asset/
-terminal_full_output/
+*.pyc
