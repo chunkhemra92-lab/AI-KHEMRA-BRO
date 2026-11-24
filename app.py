@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import streamlit as st
 
 APP_VERSION = "1.0.0"
-DATA_DIR = Path(os.getenv("STORE_DATA_DIR", "/var/lib/ai-khemra-bro"))
+DATA_DIR = Path(os.getenv("STORE_DATA_DIR", str(Path(__file__).with_name(".data"))))
 DB_PATH = DATA_DIR / "movie_store.db"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "owner")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "change-me-now")

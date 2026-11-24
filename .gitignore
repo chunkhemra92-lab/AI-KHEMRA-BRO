@@ -1,4 +1,5 @@
 .env
+.data/
 movie_store.db
 movie_store.db-shm
 movie_store.db-wal
