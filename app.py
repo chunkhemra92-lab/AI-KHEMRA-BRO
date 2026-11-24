@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -7,7 +8,26 @@ from urllib.parse import urlparse
 import streamlit as st
 
 APP_VERSION = "1.0.0"
-DATA_DIR = Path(os.getenv("STORE_DATA_DIR", str(Path(__file__).with_name(".data"))))
+
+
+def writable_data_dir():
+    """Choose a writable SQLite directory across Cloud, Docker, and local runs."""
+    configured = os.getenv("STORE_DATA_DIR", "").strip()
+    candidates = [Path(configured)] if configured else []
+    candidates.extend((Path(__file__).with_name(".data"), Path(tempfile.gettempdir()) / "ai-khemra-bro"))
+    for candidate in candidates:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            probe = candidate / ".write-test"
+            probe.touch()
+            probe.unlink()
+            return candidate
+        except OSError:
+            continue
+    raise RuntimeError("No writable storage directory is available for the movie store.")
+
+
+DATA_DIR = writable_data_dir()
 DB_PATH = DATA_DIR / "movie_store.db"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "owner")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "change-me-now")
@@ -27,9 +47,10 @@ st.markdown("""
 
 
 def db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
